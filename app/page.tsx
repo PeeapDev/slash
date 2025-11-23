@@ -5,24 +5,28 @@ import LoginPage from "@/components/login-page"
 import AdminLayout from "@/components/admin-layout"
 
 export default function Home() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState("dashboard")
 
   useEffect(() => {
     // Check if user is logged in
-    const user = localStorage.getItem("current_user")
-    if (user) {
-      setIsLoggedIn(true)
+    const storedUser = localStorage.getItem("current_user")
+    if (storedUser) {
+      setUser(JSON.parse(storedUser))
     }
     setIsLoading(false)
   }, [])
 
   const handleLogin = () => {
-    setIsLoggedIn(true)
+    // Create a default user object for the session
+    const userData = { name: "Admin User", role: "superadmin" }
+    setUser(userData)
+    localStorage.setItem("current_user", JSON.stringify(userData))
   }
 
   const handleLogout = () => {
-    setIsLoggedIn(false)
+    setUser(null)
     localStorage.removeItem("current_user")
   }
 
@@ -37,13 +41,18 @@ export default function Home() {
     )
   }
 
-  if (!isLoggedIn) {
+  if (!user) {
     return <LoginPage onLogin={handleLogin} />
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminLayout onLogout={handleLogout} />
+      <AdminLayout 
+        user={user}
+        onLogout={handleLogout}
+        currentPage={currentPage}
+        onPageChange={setCurrentPage}
+      />
     </div>
   )
 }
