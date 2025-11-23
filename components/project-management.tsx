@@ -8,15 +8,38 @@ import { offlineDB, ProjectMetadata } from "@/lib/offline-first-db"
 // Sync engine disabled for pure IndexedDB testing
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
 
+interface Project {
+  id: string
+  projectName: string
+  projectCode: string
+  description: string
+  regions: string[]
+  districts: string[]
+  status: string
+  supervisors: string[]
+  startDate: string
+  endDate: string
+  type?: string
+  name?: string // For backward compatibility
+  notes?: string
+  assignedTeam?: string[]
+}
+
+interface Region {
+  id: string
+  name: string
+}
+
 export default function ProjectManagement() {
   console.log('🚀 ProjectManagement component loaded - v2 (Pure IndexedDB)')
-  const [projects, setProjects] = useState([])
-  const [regions, setRegions] = useState([])
-  const [showForm, setShowForm] = useState(false)
-  const [editingProject, setEditingProject] = useState(null)
-  const [filterStatus, setFilterStatus] = useState("all")
-  const [filterRegion, setFilterRegion] = useState("all")
-  const [userRole, setUserRole] = useState("superadmin")
+  const [projects, setProjects] = useState<Project[]>([])
+  const [regions, setRegions] = useState<Region[]>([])
+  const [showForm, setShowForm] = useState<boolean>(false)
+  const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [filterRegion, setFilterRegion] = useState<string>("all")
+  const [userRole, setUserRole] = useState<string>("superadmin")
+  const [isLoading, setIsLoading] = useState<boolean>(true)
 
   useEffect(() => {
     loadProjects()
@@ -29,6 +52,7 @@ export default function ProjectManagement() {
   const loadProjects = async () => {
     try {
       console.log('📊 Loading projects from IndexedDB...')
+      setIsLoading(true)
       await offlineDB.init()
       
       // Get projects from local IndexedDB first
@@ -42,6 +66,8 @@ export default function ProjectManagement() {
     } catch (error) {
       console.error('❌ Error loading projects from IndexedDB:', error)
       setProjects([])
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -81,6 +107,9 @@ export default function ProjectManagement() {
         samplingQuotas: [],
         activeModules: ['households', 'participants', 'samples'],
         status: formData.status || 'not_started', // Add status field for UI
+        supervisors: formData.supervisors || [], // Add supervisors array for UI
+        startDate: formData.startDate || new Date().toISOString().split('T')[0],
+        endDate: formData.endDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         configurations: { 
           sampleTypes: formData.type === 'blood_sample' ? ['BLOOD'] : 
                       formData.type === 'urine_sample' ? ['URINE'] : 
@@ -124,9 +153,10 @@ export default function ProjectManagement() {
     }
   }
 
-  const filteredProjects = projects.filter((p) => {
+  const filteredProjects = (projects || []).filter((p) => {
+    if (!p) return false
     const statusMatch = filterStatus === "all" || p.status === filterStatus
-    const regionMatch = filterRegion === "all" || p.regions.includes(filterRegion)
+    const regionMatch = filterRegion === "all" || (p.regions && p.regions.includes(filterRegion))
     return statusMatch && regionMatch
   })
 
@@ -135,8 +165,21 @@ export default function ProjectManagement() {
     userRole === "superadmin"
       ? filteredProjects
       : userRole === "regional_head"
-        ? filteredProjects.filter((p) => p.regions.includes(regions[0]?.id))
+        ? filteredProjects.filter((p) => p?.regions && regions[0]?.id && p.regions.includes(regions[0].id))
         : filteredProjects
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="text-muted-foreground">Loading projects...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -204,14 +247,14 @@ export default function ProjectManagement() {
               </tr>
             </thead>
             <tbody>
-              {visibleProjects.length > 0 ? (
+              {visibleProjects && visibleProjects.length > 0 ? (
                 visibleProjects.map((project) => (
                   <tr key={project.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="py-4 px-6 font-medium">{project.name}</td>
+                    <td className="py-4 px-6 font-medium">{project.name || project.projectName}</td>
                     <td className="py-4 px-6">{projectTypes.find((t) => t.value === project.type)?.label}</td>
                     <td className="py-4 px-6">
                       <div className="flex flex-wrap gap-2">
-                        {project.regions.map((regionId) => {
+                        {project.regions?.map((regionId) => {
                           const region = regions.find((r) => r.id === regionId)
                           return (
                             <span
@@ -239,7 +282,7 @@ export default function ProjectManagement() {
                     </td>
                     <td className="py-4 px-6">
                       <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-xs font-medium">
-                        {project.supervisors.length} supervisors
+                        {project.supervisors?.length || 0} supervisors
                       </span>
                     </td>
                     {canEdit && (

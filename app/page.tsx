@@ -2,58 +2,48 @@
 
 import { useState, useEffect } from "react"
 import LoginPage from "@/components/login-page"
-import AppLayout from "@/components/app-layout"
 import AdminLayout from "@/components/admin-layout"
 
 export default function Home() {
-  const [user, setUser] = useState(null)
-  const [currentPage, setCurrentPage] = useState("dashboard")
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const stored = localStorage.getItem("currentUser")
-    if (stored) {
-      setUser(JSON.parse(stored))
+    // Check if user is logged in
+    const user = localStorage.getItem("current_user")
+    if (user) {
+      setIsLoggedIn(true)
     }
     setIsLoading(false)
   }, [])
 
+  const handleLogin = () => {
+    setIsLoggedIn(true)
+  }
+
+  const handleLogout = () => {
+    setIsLoggedIn(false)
+    localStorage.removeItem("current_user")
+  }
+
   if (isLoading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>
-  }
-
-  if (!user) {
     return (
-      <LoginPage
-        onLogin={(credentials) => {
-          setUser(credentials)
-          localStorage.setItem("currentUser", JSON.stringify(credentials))
-        }}
-      />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
+        </div>
+      </div>
     )
   }
 
-  if (user.role === "superadmin") {
-    return (
-      <AdminLayout
-        user={user}
-        onLogout={() => {
-          setUser(null)
-          localStorage.removeItem("currentUser")
-        }}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
-    )
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} />
   }
 
   return (
-    <AppLayout
-      user={user}
-      onLogout={() => {
-        setUser(null)
-        localStorage.removeItem("currentUser")
-      }}
-    />
+    <div className="min-h-screen bg-background">
+      <AdminLayout onLogout={handleLogout} />
+    </div>
   )
 }
