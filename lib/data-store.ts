@@ -1,3 +1,10 @@
+// Data stores with database integration
+import { HouseholdService, ParticipantService, SampleService } from './database-services'
+
+// Check if we're in browser environment and database is available
+const isClient = typeof window !== 'undefined'
+const isDatabaseEnabled = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_ENABLED
+
 export interface HouseholdData {
   id: string
   householdId: string

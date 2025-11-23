@@ -8,6 +8,7 @@ import { getRoles, updateRole, deleteRole } from "@/lib/admin-data-store"
 import AICredentials from "@/components/ai-credentials"
 import AISettings from "@/components/ai-settings"
 import SystemLogs from "@/components/system-logs"
+import DatabaseSetup from "@/components/database-setup"
 
 // Type definitions for roles
 interface Role {
@@ -107,6 +108,14 @@ export default function AppConfiguration() {
           }`}
         >
           System Logs
+        </button>
+        <button
+          onClick={() => setActiveTab("database")}
+          className={`px-4 py-2 border-b-2 transition-colors font-medium ${
+            activeTab === "database" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
+          }`}
+        >
+          Database
         </button>
       </div>
 
@@ -294,6 +303,19 @@ export default function AppConfiguration() {
               View system activity logs, error reports, and monitoring data.
             </p>
             <SystemLogs />
+          </div>
+        </div>
+      )}
+
+      {/* Database Tab */}
+      {activeTab === "database" && (
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Database Configuration</h2>
+            <p className="text-muted-foreground">
+              Manage database connections, initialize tables, and monitor database health.
+            </p>
+            <DatabaseSetup />
           </div>
         </div>
       )}
