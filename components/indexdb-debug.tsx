@@ -13,7 +13,7 @@ import {
   CheckCircle,
   Info
 } from "lucide-react"
-import { indexedDBService } from "@/lib/indexdb-service"
+import { offlineDB } from "@/lib/offline-first-db"
 
 interface DBStore {
   name: string
@@ -28,10 +28,9 @@ export default function IndexedDBDebug() {
   const [dbExists, setDbExists] = useState(false)
 
   const storeNames = [
-    'forms', 'form_responses', 'household_data', 'participant_data',
-    'sample_collection_data', 'lab_analysis', 'audit_flags', 'sync_status',
-    'admin_users', 'regions', 'districts', 'audit_logs', 'projects',
-    'ai_settings', 'app_settings', 'offline_queue', 'sync_metadata'
+    'households', 'participants', 'surveys', 'samples',
+    'forms', 'form_responses', 'project_metadata',
+    'sync_queue', 'audit_trails', 'settings'
   ]
 
   useEffect(() => {
@@ -44,7 +43,7 @@ export default function IndexedDBDebug() {
     
     try {
       const databases = await indexedDB.databases()
-      const slashDB = databases.find(db => db.name === 'SLASH_PWA_DB')
+      const slashDB = databases.find(db => db.name === 'SLASH_FIELDWORK_DB')
       setDbExists(!!slashDB)
     } catch (error) {
       console.error('Error checking database existence:', error)
@@ -56,13 +55,13 @@ export default function IndexedDBDebug() {
     
     setIsLoading(true)
     try {
-      await indexedDBService.init()
+      await offlineDB.init()
       
       const storeData: DBStore[] = []
       
       for (const storeName of storeNames) {
         try {
-          const data = await indexedDBService.getAll(storeName as any)
+          const data = await offlineDB.getAll(storeName as any)
           storeData.push({
             name: storeName,
             count: data.length,
@@ -92,7 +91,11 @@ export default function IndexedDBDebug() {
     }
     
     try {
-      await indexedDBService.clear(storeName as any)
+      // Clear all data from the store (implement clear method if needed)
+      const allData = await offlineDB.getAll(storeName as any)
+      for (const item of allData) {
+        await offlineDB.delete(storeName as any, item.id)
+      }
       await loadStoreData()
       console.log(`✅ Cleared ${storeName}`)
     } catch (error) {
@@ -102,10 +105,10 @@ export default function IndexedDBDebug() {
 
   const initializeDB = async () => {
     try {
-      await indexedDBService.init()
+      await offlineDB.init()
       await loadStoreData()
       await checkDBExists()
-      console.log('✅ IndexedDB initialized')
+      console.log('✅ OfflineDB initialized')
     } catch (error) {
       console.error('Error initializing IndexedDB:', error)
     }

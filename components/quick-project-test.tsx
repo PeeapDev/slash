@@ -13,7 +13,7 @@ import {
   CheckCircle,
   TestTube
 } from "lucide-react"
-import { indexedDBService } from "@/lib/indexdb-service"
+import { offlineDB, ProjectMetadata } from "@/lib/offline-first-db"
 
 export default function QuickProjectTest() {
   const [projectName, setProjectName] = useState("")
@@ -30,28 +30,32 @@ export default function QuickProjectTest() {
     setMessage(null)
 
     try {
-      // Initialize IndexedDB first
-      await indexedDBService.init()
+      // Initialize offline DB first
+      await offlineDB.init()
 
-      // Create project object
-      const project = {
-        id: `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        project_code: `PROJ-${Date.now()}`,
-        project_name: projectName,
+      // Create project object using proper ProjectMetadata structure
+      const projectData = {
+        projectId: `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        projectName: projectName,
+        projectCode: `PROJ-${Date.now()}`,
         description: 'Test project created via IndexedDB',
-        region_ids: ['western', 'eastern'],
-        district_ids: ['freetown', 'kenema'],
-        expected_sample_types: ['URINE', 'BLOOD'],
-        target_samples_count: 100,
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-        created_by: 'admin',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        principalInvestigator: 'Test PI',
+        studyPeriod: {
+          start: new Date().toISOString().split('T')[0],
+          end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        },
+        targetSampleSize: 100,
+        regions: ['western', 'eastern'],
+        districts: ['freetown', 'kenema'],
+        assignments: [],
+        milestones: [],
+        samplingQuotas: [],
+        activeModules: ['households', 'participants', 'samples'],
+        configurations: { sampleTypes: ['URINE', 'BLOOD'] }
       }
 
-      // Store directly in IndexedDB
-      await indexedDBService.set('projects', project)
+      // Store using the create method which handles BaseRecord fields
+      await offlineDB.create<ProjectMetadata>('project_metadata', projectData)
       
       setMessage({ 
         type: 'success', 
@@ -59,7 +63,7 @@ export default function QuickProjectTest() {
       })
       setProjectName("")
 
-      console.log('✅ Project saved to IndexedDB:', project)
+      console.log('✅ Project saved to IndexedDB:', projectData)
 
     } catch (error) {
       console.error('❌ Error creating project:', error)
@@ -77,11 +81,11 @@ export default function QuickProjectTest() {
     setMessage(null)
 
     try {
-      // Test IndexedDB functionality
-      await indexedDBService.init()
+      // Test offline DB functionality
+      await offlineDB.init()
       
       // Try to get all projects
-      const projects = await indexedDBService.getAll('projects')
+      const projects = await offlineDB.getAll('project_metadata')
       
       setMessage({ 
         type: 'success', 
