@@ -196,103 +196,94 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden w-full">
-        {/* Top Header - Mobile Optimized */}
-        <div className="h-14 lg:h-16 bg-card border-b border-border flex items-center justify-between px-3 lg:px-6">
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(true)}
-            className="lg:hidden p-2 -ml-2 hover:bg-muted rounded-lg touch-manipulation"
-            aria-label="Open menu"
-          >
-            <Menu size={22} />
-          </button>
-
+        {/* Desktop Header Only */}
+        <div className="hidden lg:flex h-16 bg-card border-b border-border items-center justify-between px-6">
           {/* Desktop User Info */}
-          <div className="hidden lg:block">
+          <div>
             <h2 className="text-sm text-muted-foreground">Welcome back</h2>
             <p className="font-semibold">{user?.email || "SuperAdmin"}</p>
           </div>
 
-          {/* Mobile Title & Page Name */}
-          <div className="lg:hidden flex-1 px-3">
-            <h1 className="font-bold text-base">SLASH</h1>
-          </div>
-
-          {/* Actions - Minimal on Mobile */}
-          <div className="flex items-center gap-1 lg:gap-3">
-            {/* Desktop Only */}
-            <div className="hidden lg:flex items-center gap-2">
-              <SyncStatus compact />
-              <NetworkStatus />
-              <ThemeToggle />
-              <button className="p-2 hover:bg-muted rounded-lg">
-                <Bell size={20} />
-              </button>
-            </div>
-            
-            {/* Mobile Only */}
-            <div className="lg:hidden">
-              <ThemeToggle />
-            </div>
-            
-            {/* Logout - Always Visible */}
-            <Button 
-              onClick={onLogout} 
-              variant="ghost" 
-              size="sm" 
-              className="gap-2 h-9 px-2 lg:px-3"
-            >
+          {/* Desktop Actions */}
+          <div className="flex items-center gap-3">
+            <SyncStatus compact />
+            <NetworkStatus />
+            <ThemeToggle />
+            <button className="p-2 hover:bg-muted rounded-lg">
+              <Bell size={20} />
+            </button>
+            <Button onClick={onLogout} variant="ghost" size="sm" className="gap-2">
               <LogOut size={18} />
-              <span className="hidden lg:inline">Logout</span>
+              Logout
             </Button>
           </div>
         </div>
 
         {/* Page Content - Mobile Optimized */}
         <div className="flex-1 overflow-auto">
-          <div className="p-3 lg:p-6 pb-20 lg:pb-6">{renderPage()}</div>
+          {/* Mobile: No padding top, content fills screen */}
+          <div className="p-0 lg:p-6 pb-20 lg:pb-6">{renderPage()}</div>
         </div>
 
-        {/* Mobile Bottom Navigation */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card/95 backdrop-blur-sm border-t border-border z-30 safe-area-inset-bottom">
-          <div className="flex items-center justify-around py-1.5 px-1 max-w-2xl mx-auto">
+        {/* Floating Menu Button (Mobile/Tablet Only) */}
+        <button
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="lg:hidden fixed top-4 right-4 z-40 p-4 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all touch-manipulation active:scale-95"
+          aria-label="Open menu"
+        >
+          <Menu size={24} />
+        </button>
+
+        {/* Mobile Bottom Navigation - Field Work Tools */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t border-border/50 z-30 safe-area-inset-bottom shadow-2xl">
+          <div className="flex items-center justify-around py-2 px-2 max-w-2xl mx-auto">
             <button
               onClick={() => changePage('dashboard')}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg touch-manipulation transition-colors ${
-                page === 'dashboard' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
+              className={`flex flex-col items-center gap-1 px-5 py-2.5 rounded-xl touch-manipulation transition-all ${
+                page === 'dashboard' 
+                  ? 'text-primary scale-105' 
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               aria-label="Home"
             >
               <span className="text-2xl">📊</span>
-              <span className="text-[10px] font-medium">Home</span>
+              <span className="text-[11px] font-semibold">Home</span>
             </button>
             <button
               onClick={() => changePage('households')}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg touch-manipulation transition-colors ${
-                page === 'households' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
+              className={`flex flex-col items-center gap-1 px-5 py-2.5 rounded-xl touch-manipulation transition-all ${
+                page === 'households' 
+                  ? 'text-primary scale-105' 
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               aria-label="Households"
             >
               <span className="text-2xl">🏠</span>
-              <span className="text-[10px] font-medium">Collect</span>
+              <span className="text-[11px] font-semibold">Collect</span>
+            </button>
+            <button
+              onClick={() => changePage('participants')}
+              className={`flex flex-col items-center gap-1 px-5 py-2.5 rounded-xl touch-manipulation transition-all ${
+                page === 'participants' 
+                  ? 'text-primary scale-105' 
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+              aria-label="Participants"
+            >
+              <span className="text-2xl">👥</span>
+              <span className="text-[11px] font-semibold">People</span>
             </button>
             <button
               onClick={() => changePage('samples')}
-              className={`flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg touch-manipulation transition-colors ${
-                page === 'samples' ? 'text-primary bg-primary/10' : 'text-muted-foreground'
+              className={`flex flex-col items-center gap-1 px-5 py-2.5 rounded-xl touch-manipulation transition-all ${
+                page === 'samples' 
+                  ? 'text-primary scale-105' 
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               aria-label="Samples"
             >
               <span className="text-2xl">🧪</span>
-              <span className="text-[10px] font-medium">Samples</span>
-            </button>
-            <button
-              onClick={() => setIsMobileMenuOpen(true)}
-              className="flex flex-col items-center gap-0.5 px-4 py-2 rounded-lg touch-manipulation text-muted-foreground transition-colors hover:text-primary"
-              aria-label="Menu"
-            >
-              <Menu size={24} />
-              <span className="text-[10px] font-medium">Menu</span>
+              <span className="text-[11px] font-semibold">Samples</span>
             </button>
           </div>
         </div>

@@ -95,24 +95,25 @@ export default function MobileDashboard() {
   }
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold">Dashboard</h2>
-          <p className="text-sm text-muted-foreground">Field Data Collection</p>
+    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 p-4 pb-24">
+      <div className="space-y-4 max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between pt-2">
+          <div>
+            <h2 className="text-2xl md:text-3xl font-bold">Dashboard</h2>
+            <p className="text-sm text-muted-foreground">Field Data Collection</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => loadData()}
+            disabled={refreshing}
+            className="gap-2 rounded-full"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => loadData()}
-          disabled={refreshing}
-          className="gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          <span className="hidden sm:inline">Refresh</span>
-        </Button>
-      </div>
 
       {/* Stats Cards - Mobile Optimized */}
       <div className="grid grid-cols-1 gap-3">
@@ -254,6 +255,7 @@ export default function MobileDashboard() {
           </Button>
         </motion.div>
       )}
+      </div>
     </div>
   )
 }
