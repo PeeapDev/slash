@@ -4,15 +4,74 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2, Eye } from "lucide-react"
-// Removed admin-data-store - now using IndexedDB-first approach
 import { SIERRA_LEONE_REGIONS, getDistrictsByRegion } from "@/lib/sierra-leone-regions"
 
+// TypeScript interfaces
+interface Household {
+  id: string
+  householdId: string
+  headName: string
+  region: string
+  district: string
+  address?: string
+  gpsCoordinates?: string
+  totalMembers: number
+  projectId: string
+  status: 'active' | 'inactive'
+  numParticipants?: number
+  numSamplesUrine?: number
+  numSamplesBlood?: number
+  assignedCollector?: string
+  supervisorId?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+  syncStatus: 'pending' | 'synced'
+  version: number
+}
+
+interface Project {
+  id: string
+  name: string
+  projectCode?: string
+}
+
+interface Region {
+  id: string
+  name: string
+}
+
+interface FormData {
+  headName: string
+  region: string
+  district: string
+  address: string
+  gpsCoordinates: string
+  projectId: string
+  totalMembers: number
+  numParticipants: number
+  numSamplesUrine: number
+  numSamplesBlood: number
+  status: 'active' | 'inactive'
+  assignedCollector: string
+  supervisorId: string
+  notes: string
+}
+
+interface HouseholdFormModalProps {
+  household: Household | null
+  projects: Project[]
+  regions: Region[]
+  onSave: (data: FormData) => void
+  onClose: () => void
+}
+
 export default function HouseholdManagement() {
-  const [households, setHouseholds] = useState([])
-  const [projects, setProjects] = useState([])
-  const [regions, setRegions] = useState([])
+  const [households, setHouseholds] = useState<Household[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [regions, setRegions] = useState<Region[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [editingHousehold, setEditingHousehold] = useState(null)
+  const [editingHousehold, setEditingHousehold] = useState<Household | null>(null)
   const [filterProject, setFilterProject] = useState("all")
   const [filterRegion, setFilterRegion] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -67,23 +126,29 @@ export default function HouseholdManagement() {
   }
 
   // INDEXEDDB-FIRST: Add household to IndexedDB + Sync Queue
-  const handleAddHousehold = async (formData) => {
+  const handleAddHousehold = async (formData: FormData) => {
     try {
       console.log('🏠 Creating new household in IndexedDB...')
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
 
-      const newHousehold = {
+      const newHousehold: Household = {
         id: `HH_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        householdId: formData.householdId || `HH-${Date.now()}`,
+        householdId: `HH-${Date.now()}`,
         headName: formData.headName,
         region: formData.region,
         district: formData.district,
         address: formData.address,
         gpsCoordinates: formData.gpsCoordinates,
-        totalMembers: parseInt(formData.totalMembers) || 0,
+        totalMembers: formData.totalMembers || 0,
         projectId: formData.projectId,
         status: formData.status || 'active',
+        numParticipants: formData.numParticipants || 0,
+        numSamplesUrine: formData.numSamplesUrine || 0,
+        numSamplesBlood: formData.numSamplesBlood || 0,
+        assignedCollector: formData.assignedCollector,
+        supervisorId: formData.supervisorId,
+        notes: formData.notes,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         syncStatus: 'pending',
@@ -101,7 +166,7 @@ export default function HouseholdManagement() {
   }
 
   // INDEXEDDB-FIRST: Update household in IndexedDB + Sync Queue
-  const handleUpdateHousehold = async (id, formData) => {
+  const handleUpdateHousehold = async (id: string, formData: FormData) => {
     try {
       console.log(`🏠 Updating household ${id} in IndexedDB...`)
       const { offlineDB } = await import('@/lib/offline-first-db')
@@ -109,8 +174,12 @@ export default function HouseholdManagement() {
 
       const updatedData = {
         ...formData,
+        totalMembers: formData.totalMembers || 0,
+        numParticipants: formData.numParticipants || 0,
+        numSamplesUrine: formData.numSamplesUrine || 0,
+        numSamplesBlood: formData.numSamplesBlood || 0,
         updatedAt: new Date().toISOString(),
-        syncStatus: 'pending'
+        syncStatus: 'pending' as const
       }
 
       await offlineDB.update('households', id, updatedData)
@@ -124,7 +193,7 @@ export default function HouseholdManagement() {
   }
 
   // INDEXEDDB-FIRST: Delete household from IndexedDB + Sync Queue
-  const handleDeleteHousehold = async (id) => {
+  const handleDeleteHousehold = async (id: string) => {
     if (confirm("Are you sure you want to delete this household?")) {
       try {
         console.log(`🏠 Deleting household ${id} from IndexedDB...`)
@@ -141,7 +210,7 @@ export default function HouseholdManagement() {
     }
   }
 
-  const filteredHouseholds = households.filter((h) => {
+  const filteredHouseholds = households.filter((h: Household) => {
     const projectMatch = filterProject === "all" || h.projectId === filterProject
     const regionMatch = filterRegion === "all" || h.region === filterRegion
     const statusMatch = filterStatus === "all" || h.status === filterStatus
@@ -176,7 +245,7 @@ export default function HouseholdManagement() {
             className="px-3 py-2 border border-border rounded-lg text-sm"
           >
             <option value="all">All Projects</option>
-            {projects.map((p) => (
+            {projects.map((p: Project) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -191,7 +260,7 @@ export default function HouseholdManagement() {
             className="px-3 py-2 border border-border rounded-lg text-sm"
           >
             <option value="all">All Regions</option>
-            {regions.map((r) => (
+            {regions.map((r: Region) => (
               <option key={r.id} value={r.id}>
                 {r.name}
               </option>
@@ -230,17 +299,17 @@ export default function HouseholdManagement() {
             </thead>
             <tbody>
               {filteredHouseholds.length > 0 ? (
-                filteredHouseholds.map((household) => (
+                filteredHouseholds.map((household: Household) => (
                   <tr key={household.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="py-4 px-6 font-mono text-xs font-medium">{household.id}</td>
+                    <td className="py-4 px-6 font-mono text-xs font-medium">{household.householdId}</td>
                     <td className="py-4 px-6 font-medium">{household.headName}</td>
                     <td className="py-4 px-6 text-sm">
                       {household.region} / {household.district}
                     </td>
-                    <td className="py-4 px-6 text-center font-medium">{household.numParticipants}</td>
+                    <td className="py-4 px-6 text-center font-medium">{household.numParticipants || 0}</td>
                     <td className="py-4 px-6 text-center text-xs">
                       <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                        U: {household.numSamplesUrine} B: {household.numSamplesBlood}
+                        U: {household.numSamplesUrine || 0} B: {household.numSamplesBlood || 0}
                       </span>
                     </td>
                     <td className="py-4 px-6">
@@ -253,7 +322,7 @@ export default function HouseholdManagement() {
                       </span>
                     </td>
                     <td className="py-4 px-6 text-xs">
-                      {projects.find((p) => p.id === household.projectId)?.name || household.projectId}
+                      {projects.find((p: Project) => p.id === household.projectId)?.name || household.projectId}
                     </td>
                     <td className="py-4 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
@@ -317,19 +386,35 @@ export default function HouseholdManagement() {
   )
 }
 
-function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
-  const [formData, setFormData] = useState(
-    household || {
+function HouseholdFormModal({ household, projects, regions, onSave, onClose }: HouseholdFormModalProps) {
+  const [formData, setFormData] = useState<FormData>(
+    household ? {
+      headName: household.headName,
+      region: household.region,
+      district: household.district,
+      address: household.address || "",
+      gpsCoordinates: household.gpsCoordinates || "",
+      projectId: household.projectId,
+      totalMembers: household.totalMembers,
+      numParticipants: household.numParticipants || 0,
+      numSamplesUrine: household.numSamplesUrine || 0,
+      numSamplesBlood: household.numSamplesBlood || 0,
+      status: household.status,
+      assignedCollector: household.assignedCollector || "",
+      supervisorId: household.supervisorId || "",
+      notes: household.notes || "",
+    } : {
       headName: "",
       region: "",
       district: "",
       address: "",
-      gps: "",
+      gpsCoordinates: "",
       projectId: "",
+      totalMembers: 0,
       numParticipants: 0,
       numSamplesUrine: 0,
       numSamplesBlood: 0,
-      status: "active",
+      status: "active" as const,
       assignedCollector: "",
       supervisorId: "",
       notes: "",
@@ -338,7 +423,7 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
 
   const districts = formData.region ? getDistrictsByRegion(formData.region) : []
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSave(formData)
   }
@@ -369,7 +454,7 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
                 className="w-full px-3 py-2 border border-border rounded-lg"
               >
                 <option value="">Select Project</option>
-                {projects.map((p) => (
+                {projects.map((p: Project) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
                   </option>
@@ -388,7 +473,7 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
                 className="w-full px-3 py-2 border border-border rounded-lg"
               >
                 <option value="">Select Region</option>
-                {regions.map((r) => (
+                {regions.map((r: Region) => (
                   <option key={r.id} value={r.id}>
                     {r.name}
                   </option>
@@ -405,7 +490,7 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
                 disabled={!formData.region}
               >
                 <option value="">Select District</option>
-                {districts.map((d) => (
+                {districts.map((d: any) => (
                   <option key={d.id} value={d.id}>
                     {d.name}
                   </option>
@@ -419,8 +504,8 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
             <input
               type="text"
               placeholder="e.g., 12.345, -67.890"
-              value={formData.gps}
-              onChange={(e) => setFormData({ ...formData, gps: e.target.value })}
+              value={formData.gpsCoordinates}
+              onChange={(e) => setFormData({ ...formData, gpsCoordinates: e.target.value })}
               className="w-full px-3 py-2 border border-border rounded-lg"
             />
           </div>
@@ -431,8 +516,8 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
               <input
                 type="number"
                 min="0"
-                value={formData.numParticipants}
-                onChange={(e) => setFormData({ ...formData, numParticipants: Number.parseInt(e.target.value) })}
+                value={formData.totalMembers}
+                onChange={(e) => setFormData({ ...formData, totalMembers: parseInt(e.target.value) || 0, numParticipants: parseInt(e.target.value) || 0 })}
                 className="w-full px-3 py-2 border border-border rounded-lg"
               />
             </div>
@@ -442,7 +527,7 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
                 type="number"
                 min="0"
                 value={formData.numSamplesUrine}
-                onChange={(e) => setFormData({ ...formData, numSamplesUrine: Number.parseInt(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, numSamplesUrine: parseInt(e.target.value) || 0 })}
                 className="w-full px-3 py-2 border border-border rounded-lg"
               />
             </div>
@@ -452,7 +537,7 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }) {
                 type="number"
                 min="0"
                 value={formData.numSamplesBlood}
-                onChange={(e) => setFormData({ ...formData, numSamplesBlood: Number.parseInt(e.target.value) })}
+                onChange={(e) => setFormData({ ...formData, numSamplesBlood: parseInt(e.target.value) || 0 })}
                 className="w-full px-3 py-2 border border-border rounded-lg"
               />
             </div>
