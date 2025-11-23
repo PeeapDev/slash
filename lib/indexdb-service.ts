@@ -447,7 +447,7 @@ class IndexedDBService {
 export const indexedDBService = new IndexedDBService()
 
 // Initialize on module load (browser only)
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
   indexedDBService.init()
     .then(() => console.log('IndexedDB service ready'))
     .catch((error) => console.error('IndexedDB initialization failed:', error))

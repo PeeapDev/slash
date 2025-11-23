@@ -18,7 +18,7 @@ export interface InstallPromptEvent extends Event {
 class PWAManager {
   private state: PWAState = {
     isInstalled: false,
-    isOnline: navigator?.onLine ?? true,
+    isOnline: true,
     hasUpdate: false,
     isInstallPromptAvailable: false,
     registration: null
@@ -28,7 +28,9 @@ class PWAManager {
   private installPromptEvent: InstallPromptEvent | null = null
 
   constructor() {
-    if (typeof window !== 'undefined') {
+    // Only initialize in browser environment
+    if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+      this.state.isOnline = navigator.onLine
       this.initializePWA()
     }
   }

@@ -211,7 +211,7 @@ class MigrationService {
 export const migrationService = new MigrationService()
 
 // Auto-migrate on module load (browser only)
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
   // Run migration after a short delay to avoid blocking initial render
   setTimeout(() => {
     migrationService.migrateFromLocalStorage()

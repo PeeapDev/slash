@@ -22,6 +22,8 @@ import { usePWA } from "@/lib/pwa-utils"
 import { indexedDBService } from "@/lib/indexdb-service"
 import { migrationService } from "@/lib/migration-service"
 import { getDataSummary } from "@/lib/offline-data-store"
+import IndexedDBDebug from "./indexdb-debug"
+import QuickProjectTest from "./quick-project-test"
 
 interface StorageInfo {
   used: number
@@ -357,6 +359,12 @@ export default function PWAStatus() {
           </div>
         </Card>
       )}
+
+      {/* Quick Project Test */}
+      <QuickProjectTest />
+
+      {/* IndexedDB Debug Console */}
+      <IndexedDBDebug />
     </div>
   )
 }

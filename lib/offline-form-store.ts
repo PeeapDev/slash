@@ -594,7 +594,7 @@ export async function initializeDefaultForms(): Promise<void> {
 }
 
 // Auto-initialize default forms
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && typeof indexedDB !== 'undefined') {
   setTimeout(() => {
     initializeDefaultForms()
   }, 2000)
