@@ -308,6 +308,7 @@ export interface TeamMemberDB extends BaseRecord {
   userId: string
   email: string
   fullName: string
+  phone?: string
   role: string
   regionId?: string
   districtId?: string
@@ -317,6 +318,7 @@ export interface TeamMemberDB extends BaseRecord {
   employmentStatus: string
   hireDate: string
   lastActiveAt?: string
+  defaultPassword?: string
   permissions: any
 }
 

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Trash2, Eye } from "lucide-react"
-// Removed admin-data-store - now using IndexedDB-first approach
+import { Plus, Trash2, Eye, Lock } from "lucide-react"
 import { generateId } from "@/lib/utils"
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
+import { ROLE_DEFINITIONS, TeamRole } from "@/lib/team-roles"
 
 export default function HRManagement() {
   const [staff, setStaff] = useState([])
@@ -29,27 +30,37 @@ export default function HRManagement() {
     setRegions(SIERRA_LEONE_REGIONS)
   }, [])
 
-  // INDEXEDDB-FIRST: Load staff from IndexedDB (Note: Using Settings store for now)
+  // INDEXEDDB-FIRST: Load staff from team_members store
   const loadStaff = async () => {
     try {
-      console.log('👥 Loading staff from IndexedDB...')
+      console.log('👥 Loading staff from team_members store...')
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
       
-      // For now, using settings store to store staff (can be moved to dedicated store later)
-      const staffSettings = await offlineDB.getAll('settings')
-      const staffData = staffSettings.filter(s => s.key && s.key.startsWith('staff_'))
+      // Load from team_members store (dedicated store for staff)
+      const teamMembers = await offlineDB.getAll('team_members')
       
-      const formattedStaff = staffData.map(s => ({
-        id: s.key.replace('staff_', ''),
-        ...s.value
+      const formattedStaff = teamMembers.map((member: any) => ({
+        id: member.id,
+        name: member.fullName,
+        email: member.email,
+        phone: member.phone || '',
+        role: member.role,
+        region: member.regionId || null,
+        district: member.districtId || null,
+        status: member.isActive ? 'active' : 'inactive',
+        employmentType: member.employmentStatus || 'active',
+        joinDate: member.hireDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+        password: member.defaultPassword || '',
+        createdAt: member.createdAt,
+        updatedAt: member.updatedAt
       }))
       
-      console.log(`✅ Loaded ${formattedStaff.length} staff members from IndexedDB`)
+      console.log(`✅ Loaded ${formattedStaff.length} staff members from team_members store`)
       setStaff(formattedStaff)
       
       if (formattedStaff.length === 0) {
-        console.log('ℹ️ No staff found in IndexedDB - create staff to see them here')
+        console.log('ℹ️ No staff found - create staff to see them here')
       }
     } catch (error) {
       console.error('❌ Error loading staff from IndexedDB:', error)
@@ -57,29 +68,26 @@ export default function HRManagement() {
     }
   }
 
-  // INDEXEDDB-FIRST: Load roles from IndexedDB (using default roles for now)
+  // INDEXEDDB-FIRST: Load all 8 roles from team-roles library
   const loadRoles = async () => {
     try {
-      console.log('👥 Loading roles for HR dropdown...')
-      // Use default roles (same as in app-configuration)
-      const defaultRoles = [
-        { id: 'superadmin', name: 'Super Admin' },
-        { id: 'field_collector', name: 'Field Collector' },
-        { id: 'lab_technician', name: 'Lab Technician' },
-        { id: 'supervisor', name: 'Supervisor' },
-        { id: 'regional_head', name: 'Regional Head' },
-        { id: 'ai_data_manager', name: 'AI Data Manager' }
-      ]
+      console.log('👥 Loading all 8 roles from team-roles library...')
+      // Use all roles from ROLE_DEFINITIONS
+      const allRoles = (Object.keys(ROLE_DEFINITIONS) as TeamRole[]).map(roleKey => ({
+        id: roleKey,
+        name: ROLE_DEFINITIONS[roleKey].title,
+        description: ROLE_DEFINITIONS[roleKey].description
+      }))
       
-      setRoles(defaultRoles)
-      console.log(`✅ Loaded ${defaultRoles.length} roles`)
+      setRoles(allRoles)
+      console.log(`✅ Loaded ${allRoles.length} roles from team-roles library`)
     } catch (error) {
       console.error('❌ Error loading roles:', error)
       setRoles([])
     }
   }
 
-  // INDEXEDDB-FIRST: Add staff to IndexedDB + Sync Queue
+  // INDEXEDDB-FIRST: Add staff to team_members store with default password
   const handleAddStaff = async () => {
     if (formData.name && formData.email && formData.role) {
       if (formData.role === "supervisor" && !formData.region) {
@@ -88,41 +96,42 @@ export default function HRManagement() {
       }
 
       try {
-        console.log('👥 Creating new staff member in IndexedDB...')
+        console.log('👥 Creating new staff member in team_members store...')
         const { offlineDB } = await import('@/lib/offline-first-db')
         await offlineDB.init()
 
-        const newStaff = {
-          id: generateId("STF"),
-          name: formData.name,
+        // Generate default password: 123456 + phone or email
+        const passwordSuffix = formData.phone || formData.email.split('@')[0]
+        const defaultPassword = `123456${passwordSuffix}`
+
+        const newStaffMember = {
+          id: `TEAM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          userId: `USER_${Date.now()}`,
+          fullName: formData.name,
           email: formData.email,
           phone: formData.phone,
           role: formData.role,
-          region: formData.region || null,
-          district: null,
-          status: "active",
-          employmentType: formData.employmentType,
-          joinDate: new Date().toISOString().split("T")[0],
+          regionId: formData.region || undefined,
+          districtId: undefined,
+          teamId: undefined,
+          supervisorId: undefined,
+          isActive: true,
+          employmentStatus: 'active',
+          hireDate: new Date().toISOString(),
+          lastActiveAt: undefined,
+          defaultPassword: defaultPassword,
+          permissions: ROLE_DEFINITIONS[formData.role as TeamRole].permissions,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          syncStatus: 'pending',
-          version: 1
+          syncStatus: 'pending' as const,
+          version: 1,
+          deviceId: 'admin',
+          collectorId: 'admin'
         }
 
-        // Store in settings with staff_ prefix
-        const staffSetting = {
-          id: `staff_${newStaff.id}`,
-          key: `staff_${newStaff.id}`,
-          value: newStaff,
-          category: 'hr',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          syncStatus: 'pending',
-          version: 1
-        }
-
-        await offlineDB.create('settings', staffSetting)
-        console.log('✅ Staff member created in IndexedDB + added to sync queue')
+        await offlineDB.create('team_members', newStaffMember)
+        console.log(`✅ Staff member created with default password: ${defaultPassword}`)
+        alert(`Staff created! Default password: ${defaultPassword}\nStaff can login and change password.`)
         
         await loadStaff() // Refresh from IndexedDB
         setFormData({
@@ -136,19 +145,24 @@ export default function HRManagement() {
         setShowForm(false)
       } catch (error) {
         console.error('❌ Error creating staff member:', error)
+        alert('Error creating staff member. Check console for details.')
       }
+    } else {
+      alert('Please fill in all required fields (Name, Email, Role)')
     }
   }
 
-  // INDEXEDDB-FIRST: Delete staff from IndexedDB + Sync Queue
+  // INDEXEDDB-FIRST: Delete staff from team_members store
   const handleDeleteStaff = async (id) => {
+    if (!confirm('Are you sure you want to delete this staff member?')) return
+    
     try {
-      console.log(`👥 Deleting staff ${id} from IndexedDB...`)
+      console.log(`👥 Deleting staff ${id} from team_members store...`)
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
 
-      await offlineDB.delete('settings', `staff_${id}`)
-      console.log('✅ Staff member deleted from IndexedDB + added to sync queue')
+      await offlineDB.delete('team_members', id)
+      console.log('✅ Staff member deleted from team_members store')
       
       await loadStaff() // Refresh from IndexedDB
       setSelectedStaff(null)
@@ -157,37 +171,41 @@ export default function HRManagement() {
     }
   }
 
-  // INDEXEDDB-FIRST: Update staff status in IndexedDB + Sync Queue
+  // INDEXEDDB-FIRST: Update staff status in team_members store
   const handleUpdateStatus = async (id, status) => {
     try {
       console.log(`👥 Updating staff ${id} status to ${status}...`)
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
 
-      // Get existing staff data
-      const existing = await offlineDB.getById('settings', `staff_${id}`)
+      // Get existing member data
+      const existing = await offlineDB.get('team_members', id)
       if (existing) {
-        const updatedStaff = {
-          ...existing.value,
-          status: status,
+        const updated = {
+          ...existing,
+          isActive: status === 'active',
+          employmentStatus: status,
           updatedAt: new Date().toISOString()
         }
 
-        const updatedSetting = {
-          ...existing,
-          value: updatedStaff,
-          updatedAt: new Date().toISOString(),
-          syncStatus: 'pending'
-        }
-
-        await offlineDB.update('settings', `staff_${id}`, updatedSetting)
-        console.log('✅ Staff status updated in IndexedDB + added to sync queue')
+        await offlineDB.update('team_members', id, updated)
+        console.log('✅ Staff status updated in team_members store')
         
         await loadStaff() // Refresh from IndexedDB
-        const updatedStaffList = await offlineDB.getAll('settings')
-        const staffData = updatedStaffList.filter(s => s.key && s.key.startsWith('staff_'))
-        const formattedStaff = staffData.map(s => ({ id: s.key.replace('staff_', ''), ...s.value }))
-        setSelectedStaff(formattedStaff.find((s) => s.id === id))
+        const allStaff = await offlineDB.getAll('team_members')
+        const formattedStaff = allStaff.map((member: any) => ({
+          id: member.id,
+          name: member.fullName,
+          email: member.email,
+          phone: member.phone || '',
+          role: member.role,
+          region: member.regionId || null,
+          status: member.isActive ? 'active' : 'inactive',
+          employmentType: member.employmentStatus || 'active',
+          joinDate: member.hireDate?.split('T')[0],
+          password: member.defaultPassword || ''
+        }))
+        setSelectedStaff(formattedStaff.find((s: any) => s.id === id))
       }
     } catch (error) {
       console.error('❌ Error updating staff status:', error)
@@ -214,56 +232,95 @@ export default function HRManagement() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Total Staff</div>
-          <div className="text-2xl font-bold mt-1">{staff.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Active</div>
-          <div className="text-2xl font-bold mt-1">{staff.filter((s) => s.status === "active").length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Supervisors</div>
-          <div className="text-2xl font-bold mt-1">{supervisors.length}</div>
-        </Card>
-        <Card className="p-4">
-          <div className="text-sm text-muted-foreground">Field Collectors</div>
-          <div className="text-2xl font-bold mt-1">{fieldCollectors.length}</div>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="p-4 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+            <div className="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Staff</div>
+            <div className="text-3xl font-bold mt-1 text-blue-700 dark:text-blue-300">{staff.length}</div>
+          </Card>
+        </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card className="p-4 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+            <div className="text-sm text-green-600 dark:text-green-400 font-medium">Active</div>
+            <div className="text-3xl font-bold mt-1 text-green-700 dark:text-green-300">{staff.filter((s) => s.status === "active").length}</div>
+          </Card>
+        </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+        >
+          <Card className="p-4 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+            <div className="text-sm text-purple-600 dark:text-purple-400 font-medium">Supervisors</div>
+            <div className="text-3xl font-bold mt-1 text-purple-700 dark:text-purple-300">{supervisors.length}</div>
+          </Card>
+        </motion.div>
+        
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="p-4 bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
+            <div className="text-sm text-orange-600 dark:text-orange-400 font-medium">Field Collectors</div>
+            <div className="text-3xl font-bold mt-1 text-orange-700 dark:text-orange-300">{fieldCollectors.length}</div>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Add Staff Form */}
       {showForm && (
-        <Card className="p-6 bg-blue-50 border-blue-200">
-          <h2 className="font-semibold mb-4">Add New Staff Member</h2>
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+        >
+          <Card className="p-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+          <h2 className="font-semibold mb-4 text-foreground">Add New Staff Member</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            <Lock className="inline w-4 h-4 mr-1" />
+            Default password will be: <span className="font-mono font-bold">123456 + phone/email</span>
+          </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="text"
-              placeholder="Full Name"
+              placeholder="Full Name *"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
+              required
             />
             <input
               type="email"
-              placeholder="Email"
+              placeholder="Email *"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
+              required
             />
             <input
               type="tel"
-              placeholder="Phone Number"
+              placeholder="Phone Number (for password)"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
             />
             <select
               value={formData.role}
               onChange={(e) => setFormData({ ...formData, role: e.target.value, region: "" })}
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
+              required
             >
-              <option value="">Select Role</option>
+              <option value="">Select Role *</option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
                   {role.name}
@@ -271,13 +328,14 @@ export default function HRManagement() {
               ))}
             </select>
 
-            {formData.role === "supervisor" && (
+            {(formData.role === "supervisor" || formData.role === "regional_head") && (
               <select
                 value={formData.region}
                 onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                className="px-3 py-2 border rounded-lg bg-white border-red-300"
+                className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-red-600 border-red-300"
+                required
               >
-                <option value="">Select Region (Required for Supervisors)</option>
+                <option value="">Select Region (Required for Supervisors/Regional Heads)</option>
                 {regions.map((region) => (
                   <option key={region.id} value={region.id}>
                     {region.name}
@@ -289,7 +347,7 @@ export default function HRManagement() {
             <select
               value={formData.employmentType}
               onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
-              className="px-3 py-2 border rounded-lg bg-white"
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
             >
               <option value="full-time">Full-time</option>
               <option value="contract">Contract</option>
@@ -319,6 +377,7 @@ export default function HRManagement() {
             </Button>
           </div>
         </Card>
+        </motion.div>
       )}
 
       {/* Staff Table */}

@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Edit2, Trash2, Users, UserCheck, UserX } from "lucide-react"
+import { Plus, Edit2, Trash2, Users, UserCheck, UserX, Search } from "lucide-react"
 import { TeamRole, TeamMember, ROLE_DEFINITIONS, getRoleColor, getAvailableRolesForUser } from "@/lib/team-roles"
 
 export default function TeamManagement() {
@@ -139,68 +140,82 @@ export default function TeamManagement() {
 
       {/* Statistics */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs">Total Members</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{roleStats.total}</div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900/50 dark:to-slate-800/50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-muted-foreground">Total Members</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{roleStats.total}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs">Active</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{roleStats.active}</div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-green-600 dark:text-green-400">Active</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{roleStats.active}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs">Superadmins</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-purple-600">{roleStats.superadmin}</div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-purple-600 dark:text-purple-400">Superadmins</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{roleStats.superadmin}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs">Regional Heads</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">{roleStats.regional_head}</div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-blue-600 dark:text-blue-400">Regional Heads</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{roleStats.regional_head}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs">Supervisors</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{roleStats.supervisor}</div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-green-600 dark:text-green-400">Supervisors</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-700 dark:text-green-300">{roleStats.supervisor}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs">Collectors</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{roleStats.field_collector}</div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
+          <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-900/20 dark:to-yellow-800/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-yellow-600 dark:text-yellow-400">Collectors</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{roleStats.field_collector}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
         
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-xs">Lab Techs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-pink-600">{roleStats.lab_technician}</div>
-          </CardContent>
-        </Card>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}>
+          <Card className="bg-gradient-to-br from-pink-50 to-pink-100 dark:from-pink-900/20 dark:to-pink-800/20">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs text-pink-600 dark:text-pink-400">Lab Techs</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-pink-700 dark:text-pink-300">{roleStats.lab_technician}</div>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
 
       {/* Filters */}
@@ -399,82 +414,93 @@ function TeamMemberForm({
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <Card className="w-full max-w-2xl m-4">
-        <CardHeader>
-          <CardTitle>{member ? 'Edit Team Member' : 'Add Team Member'}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Full Name *</label>
-              <Input
-                value={formData.fullName}
-                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-2">Email *</label>
-              <Input
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-2">Role *</label>
-              <select
-                value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value as TeamRole })}
-                className="w-full px-3 py-2 border border-border rounded-lg"
-                required
-              >
-                {availableRoles.map(role => (
-                  <option key={role} value={role}>
-                    {ROLE_DEFINITIONS[role].title}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                {ROLE_DEFINITIONS[formData.role].description}
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="w-full max-w-2xl"
+      >
+        <Card className="bg-background dark:bg-slate-900 border-border dark:border-slate-700">
+          <CardHeader>
+            <CardTitle>{member ? 'Edit Team Member' : 'Add Team Member'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Region ID</label>
+                <label className="block text-sm font-medium mb-2 text-foreground">Full Name *</label>
                 <Input
-                  value={formData.regionId}
-                  onChange={(e) => setFormData({ ...formData, regionId: e.target.value })}
-                  placeholder="e.g., western, northern"
+                  value={formData.fullName}
+                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  className="bg-background dark:bg-slate-800 text-foreground dark:border-slate-600"
+                  required
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium mb-2">District ID</label>
+                <label className="block text-sm font-medium mb-2 text-foreground">Email *</label>
                 <Input
-                  value={formData.districtId}
-                  onChange={(e) => setFormData({ ...formData, districtId: e.target.value })}
-                  placeholder="e.g., freetown, bo"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className="bg-background dark:bg-slate-800 text-foreground dark:border-slate-600"
+                  required
                 />
               </div>
-            </div>
-            
-            <div className="flex gap-2 justify-end">
-              <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button type="submit">
-                {member ? 'Update Member' : 'Add Member'}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2 text-foreground">Role *</label>
+                <select
+                  value={formData.role}
+                  onChange={(e) => setFormData({ ...formData, role: e.target.value as TeamRole })}
+                  className="w-full px-3 py-2 border border-border dark:border-slate-600 rounded-lg bg-background dark:bg-slate-800 text-foreground"
+                  required
+                >
+                  {availableRoles.map(role => (
+                    <option key={role} value={role}>
+                      {ROLE_DEFINITIONS[role].title}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {ROLE_DEFINITIONS[formData.role].description}
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">Region ID</label>
+                  <Input
+                    value={formData.regionId}
+                    onChange={(e) => setFormData({ ...formData, regionId: e.target.value })}
+                    placeholder="e.g., western, northern"
+                    className="bg-background dark:bg-slate-800 text-foreground dark:border-slate-600"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-foreground">District ID</label>
+                  <Input
+                    value={formData.districtId}
+                    onChange={(e) => setFormData({ ...formData, districtId: e.target.value })}
+                    placeholder="e.g., freetown, bo"
+                    className="bg-background dark:bg-slate-800 text-foreground dark:border-slate-600"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-2 justify-end">
+                <Button type="button" variant="outline" onClick={onClose}>
+                  Cancel
+                </Button>
+                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
+                  {member ? 'Update Member' : 'Add Member'}
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   )
 }

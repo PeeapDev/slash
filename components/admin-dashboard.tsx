@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Card } from "@/components/ui/card"
 import {
   BarChart,
@@ -16,6 +17,20 @@ import {
   Pie,
   Cell,
 } from "recharts"
+import { 
+  getHouseholdData, 
+  getParticipantData, 
+  getSampleCollectionData, 
+  getLabAnalysis,
+  getAuditFlags,
+  type HouseholdData,
+  type ParticipantData,
+  type SampleCollectionData,
+  type LabAnalysis,
+  type AuditFlag
+} from "@/lib/offline-data-store"
+import { getProjects, type Project } from "@/lib/admin-data-store"
+import { indexedDBService } from "@/lib/indexdb-service"
 
 const regionActivityData = [
   { region: "North", households: 245, participants: 1280, samples: 892 },
