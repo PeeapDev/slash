@@ -100,7 +100,7 @@ export default function DynamicSampleForm({
         // Use fallback types if none exist
         const fallbackTypes = [
           { 
-            id: 'BLOOD', 
+            id: 'fallback_BLOOD', 
             type_code: 'BLOOD', 
             display_name: 'Blood Sample', 
             description: 'Basic blood collection',
@@ -110,7 +110,7 @@ export default function DynamicSampleForm({
             ] }
           },
           { 
-            id: 'URINE', 
+            id: 'fallback_URINE', 
             type_code: 'URINE', 
             display_name: 'Urine Sample', 
             description: 'Basic urine collection',
@@ -124,9 +124,9 @@ export default function DynamicSampleForm({
         return
       }
 
-      // Format for form compatibility
+      // Format for form compatibility and ensure unique IDs
       const formattedTypes = localTypes.map((type: any) => ({
-        id: type.id,
+        id: `db_${type.id}`, // Prefix to ensure uniqueness
         type_code: type.code,
         display_name: type.name,
         description: type.description,
@@ -135,14 +135,19 @@ export default function DynamicSampleForm({
         }
       }))
       
-      setSampleTypes(formattedTypes)
+      // Remove duplicates by type_code to prevent key conflicts
+      const uniqueTypes = formattedTypes.filter((type, index, array) => 
+        array.findIndex(t => t.type_code === type.type_code) === index
+      )
+      
+      setSampleTypes(uniqueTypes)
     } catch (error) {
       console.error('❌ Error loading sample types:', error)
       console.log('🔧 Using fallback sample types due to IndexedDB error')
       // Fallback to basic types if IndexedDB fails
       setSampleTypes([
         { 
-          id: 'BLOOD', 
+          id: 'error_BLOOD', 
           type_code: 'BLOOD', 
           display_name: 'Blood Sample', 
           description: 'Basic blood collection',
@@ -152,7 +157,7 @@ export default function DynamicSampleForm({
           ] }
         },
         { 
-          id: 'URINE', 
+          id: 'error_URINE', 
           type_code: 'URINE', 
           display_name: 'Urine Sample', 
           description: 'Basic urine collection',
