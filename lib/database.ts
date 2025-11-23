@@ -1,100 +1,46 @@
 import { createClient } from '@supabase/supabase-js'
-import { Pool } from 'pg'
 
-// Supabase client for auth and real-time features
+// Supabase client for auth and real-time features (DISABLED for IndexedDB-first)
+// Using placeholder values to prevent build errors
 export const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co',
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTIwMDAsImV4cCI6MTk2MDc2ODAwMH0.placeholder'
 )
 
-// Neon PostgreSQL connection pool for main database operations
+// PostgreSQL disabled for Vercel deployment - using IndexedDB-first architecture
+// Neon PostgreSQL connection pool for main database operations (DISABLED)
 const connectionString = process.env.DATABASE_URL
 
-let pgPool: Pool | null = null
+let pgPool: any = null
 
 export const getPool = () => {
-  if (!pgPool && connectionString) {
-    pgPool = new Pool({
-      connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      },
-      max: 20,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
-    })
-  }
-  return pgPool
+  // PostgreSQL disabled - app uses IndexedDB-first architecture
+  console.warn('PostgreSQL pool requested but disabled. Using IndexedDB-first architecture.')
+  return null
 }
 
-// Database query helper
+// Database query helper (DISABLED - IndexedDB-first architecture)
 export const query = async (text: string, params?: any[]) => {
-  const pool = getPool()
-  if (!pool) {
-    throw new Error('Database connection not available')
-  }
-  
-  const start = Date.now()
-  try {
-    const res = await pool.query(text, params)
-    const duration = Date.now() - start
-    console.log('Executed query', { text, duration, rows: res.rowCount })
-    return res
-  } catch (error) {
-    console.error('Database query error:', error)
-    throw error
-  }
+  console.warn('PostgreSQL query attempted but disabled. Using IndexedDB-first architecture.')
+  throw new Error('PostgreSQL disabled. App uses IndexedDB-first architecture.')
 }
 
-// Health check for database connections
+// Health check for database connections (DISABLED)
 export const checkDatabaseHealth = async () => {
-  const results = {
+  return {
     neon: false,
     supabase: false,
+    indexedDB: true,
+    architecture: 'offline-first',
+    message: 'App uses IndexedDB-first architecture',
     timestamp: new Date().toISOString()
   }
-
-  // Test Neon connection
-  try {
-    const pool = getPool()
-    if (pool) {
-      await pool.query('SELECT 1')
-      results.neon = true
-    }
-  } catch (error) {
-    console.error('Neon database health check failed:', error)
-  }
-
-  // Test Supabase connection
-  try {
-    const { data, error } = await supabase.from('_health_check').select('*').limit(1)
-    if (!error) {
-      results.supabase = true
-    }
-  } catch (error) {
-    console.error('Supabase health check failed:', error)
-  }
-
-  return results
 }
 
-// Initialize database tables
+// Initialize database tables (DISABLED - IndexedDB-first architecture)
 export const initializeDatabase = async () => {
-  const pool = getPool()
-  if (!pool) {
-    console.error('No database connection available for initialization')
-    return false
-  }
-
-  try {
-    // Create tables if they don't exist
-    await createTables()
-    console.log('Database initialized successfully')
-    return true
-  } catch (error) {
-    console.error('Database initialization failed:', error)
-    return false
-  }
+  console.log('PostgreSQL initialization skipped. App uses IndexedDB-first architecture.')
+  return true
 }
 
 // Create database tables

@@ -1,7 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { ParticipantService, LogService } from '@/lib/database-services'
+import { NextResponse } from 'next/server'
+
+// API route disabled - App uses IndexedDB-first architecture
 
 export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: 'This app uses IndexedDB-first architecture. Data is stored locally in IndexedDB.',
+    architecture: 'offline-first',
+    data: []
+  })
+}
+
+export async function POST() {
+  return NextResponse.json({
+    success: true,
+    message: 'This app uses IndexedDB-first architecture. Please use IndexedDB for data operations.',
+    architecture: 'offline-first'
+  })
+}
+
+/* ORIGINAL CODE - DISABLED FOR VERCEL DEPLOYMENT
+export async function GET_DISABLED() {
   try {
     const participants = await ParticipantService.getAllParticipants()
     return NextResponse.json({ success: true, data: participants })
@@ -78,3 +97,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+*/

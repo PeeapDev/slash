@@ -1,11 +1,29 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { UserService, LogService } from '@/lib/database-services'
-import { AuthService } from '@/lib/auth-service'
+import { NextResponse } from 'next/server'
 
-export async function GET(request: NextRequest) {
+// API route disabled - App uses IndexedDB-first architecture
+
+export async function GET() {
+  return NextResponse.json({
+    success: true,
+    message: 'This app uses IndexedDB-first architecture. User data is stored locally in IndexedDB.',
+    architecture: 'offline-first',
+    data: []
+  })
+}
+
+export async function POST() {
+  return NextResponse.json({
+    success: true,
+    message: 'This app uses IndexedDB-first architecture. Please use IndexedDB for user operations.',
+    architecture: 'offline-first'
+  })
+}
+
+/* ORIGINAL CODE - DISABLED FOR VERCEL DEPLOYMENT
+export async function GET_DISABLED(request: NextRequest) {
   try {
     // Get all users from Neon database
-    const users = await UserService.getAllUsers()
+    const users = await UserService.getAllUsers_DISABLED()
     
     // Remove sensitive information
     const sanitizedUsers = users.map(user => ({
@@ -108,3 +126,4 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+*/
