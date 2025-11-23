@@ -36,8 +36,9 @@ interface ParticipantFormData {
 // Helper to format household display in dropdown
 const formatHouseholdDisplay = (h: any) => {
   const name = h.headOfHousehold || h.headName || 'Unknown'
-  const address = h.address || 'No address'
-  const district = h.district || address.split(',').pop()?.trim() || 'Unknown'
+  // Check address field first, fallback to gpsCoordinates for old data
+  const address = h.address || h.gpsCoordinates || 'No address'
+  const district = h.district || 'Unknown'
   const id = h.householdId || h.id
   return `${name} - ${address} in ${district} - ${id}`
 }

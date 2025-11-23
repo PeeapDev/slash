@@ -51,19 +51,28 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
   }
 
   const adminMenuItems = [
-    { id: "dashboard", label: "Dashboard", icon: "📊" },
-    { id: "form-builder", label: "Form Builder", icon: "🎯" },
-    { id: "projects", label: "Projects", icon: "📋" },
-    { id: "households", label: "Households", icon: "🏠" },
-    { id: "participants", label: "Participants", icon: "👨" },
-    { id: "surveys", label: "Surveys", icon: "📝" },
-    { id: "samples", label: "Samples", icon: "🧪" },
-    { id: "regions", label: "Regional Management", icon: "🗺️" },
-    { id: "districts", label: "District Management", icon: "📍" },
-    { id: "hr", label: "HR Management", icon: "👥" },
-    { id: "config", label: "Configuration", icon: "⚙️" },
-    { id: "sync", label: "Sync & Offline", icon: "📡" },
-    { id: "profile", label: "User Profile", icon: "👤" },
+    // Overview
+    { id: "dashboard", label: "Dashboard", icon: "📊", section: "Overview" },
+    
+    // Field Work
+    { id: "form-builder", label: "Form Builder", icon: "🎯", section: "Field Work" },
+    { id: "households", label: "Households", icon: "🏠", section: "Field Work" },
+    { id: "participants", label: "Participants", icon: "👨", section: "Field Work" },
+    { id: "surveys", label: "Surveys", icon: "📝", section: "Field Work" },
+    
+    // Laboratory
+    { id: "samples", label: "Sample Management", icon: "🧪", section: "Laboratory" },
+    
+    // Administration
+    { id: "projects", label: "Projects", icon: "📋", section: "Administration" },
+    { id: "regions", label: "Regions", icon: "🗺️", section: "Administration" },
+    { id: "districts", label: "Districts", icon: "📍", section: "Administration" },
+    { id: "hr", label: "HR Management", icon: "👥", section: "Administration" },
+    
+    // System
+    { id: "sync", label: "Sync & Offline", icon: "📡", section: "System" },
+    { id: "config", label: "Settings", icon: "⚙️", section: "System" },
+    { id: "profile", label: "Profile", icon: "👤", section: "System" },
   ]
 
   const renderPage = () => {
@@ -116,19 +125,34 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-2">
-          {adminMenuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => changePage(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left text-sm font-medium transition-colors ${
-                page === item.id ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
-              }`}
-            >
-              <span className="text-xl">{item.icon}</span>
-              {sidebarOpen && <span>{item.label}</span>}
-            </button>
-          ))}
+        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+          {['Overview', 'Field Work', 'Laboratory', 'Administration', 'System'].map((section) => {
+            const sectionItems = adminMenuItems.filter(item => item.section === section)
+            return (
+              <div key={section} className="mb-4">
+                {sidebarOpen && (
+                  <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    {section}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {sectionItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => changePage(item.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left text-sm font-medium transition-colors ${
+                        page === item.id ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
+                      }`}
+                      title={!sidebarOpen ? item.label : undefined}
+                    >
+                      <span className="text-xl">{item.icon}</span>
+                      {sidebarOpen && <span>{item.label}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </nav>
       </div>
 

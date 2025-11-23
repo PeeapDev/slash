@@ -653,11 +653,22 @@ function HouseholdFormModal({ household, projects, regions, onSave, onClose }: H
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Address / GPS Coordinates</label>
+            <label className="block text-sm font-medium mb-2">Address</label>
+            <input
+              type="text"
+              placeholder="e.g., East End Villages, Main Street"
+              value={formData.address || ''}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="w-full px-3 py-2 border border-border rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">GPS Coordinates (Optional)</label>
             <input
               type="text"
               placeholder="e.g., 12.345, -67.890"
-              value={formData.gpsCoordinates}
+              value={formData.gpsCoordinates || ''}
               onChange={(e) => setFormData({ ...formData, gpsCoordinates: e.target.value })}
               className="w-full px-3 py-2 border border-border rounded-lg"
             />
