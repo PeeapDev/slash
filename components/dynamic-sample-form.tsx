@@ -125,6 +125,11 @@ export default function DynamicSampleForm({
   }
 
   const handleProjectChange = (projectId: string) => {
+    // Ignore the "no-projects" placeholder value
+    if (projectId === "no-projects") {
+      return
+    }
+    
     const project = projects.find(p => p.id === projectId)
     setSelectedProject(project || null)
     setSelectedSampleType(null)
@@ -365,7 +370,7 @@ export default function DynamicSampleForm({
             </SelectTrigger>
             <SelectContent>
               {projects.length === 0 ? (
-                <SelectItem value="" disabled>
+                <SelectItem value="no-projects" disabled>
                   No projects available - Create a project first
                 </SelectItem>
               ) : (
