@@ -1,5 +1,3 @@
-"use client"
-
 // Sync Queue Engine - Monitors network and syncs IndexedDB data to cloud
 import { offlineDB, SyncQueueItem } from './offline-first-db'
 

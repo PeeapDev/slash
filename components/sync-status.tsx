@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Sync, CheckCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react'
+import { RotateCw, CheckCircle, Clock, AlertCircle, RefreshCw } from 'lucide-react'
 import { syncEngine } from '@/lib/sync-queue-engine'
 
 interface SyncStatusProps {
@@ -73,7 +73,7 @@ export default function SyncStatus({ compact = false }: SyncStatusProps) {
       <div className="flex items-center gap-2 text-sm">
         <div className={`flex items-center gap-1 ${syncStatus.isOnline ? 'text-green-600' : 'text-red-600'}`}>
           {syncStatus.isRunning ? (
-            <Sync size={14} className="animate-spin" />
+            <RotateCw size={14} className="animate-spin" />
           ) : (
             <Clock size={14} />
           )}
@@ -91,7 +91,7 @@ export default function SyncStatus({ compact = false }: SyncStatusProps) {
             {isLoading ? (
               <RefreshCw size={12} className="animate-spin" />
             ) : (
-              <Sync size={12} />
+              <RotateCw size={12} />
             )}
           </Button>
         )}
@@ -107,7 +107,7 @@ export default function SyncStatus({ compact = false }: SyncStatusProps) {
           syncStatus.isOnline ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
         }`}>
           {syncStatus.isRunning ? (
-            <Sync size={14} className="animate-spin" />
+            <RotateCw size={14} className="animate-spin" />
           ) : (
             <Clock size={14} />
           )}
@@ -135,7 +135,7 @@ export default function SyncStatus({ compact = false }: SyncStatusProps) {
         </div>
 
         <div className="text-center p-4 bg-gray-50 rounded-lg">
-          <Sync className="w-8 h-8 mx-auto mb-2 text-gray-600" />
+          <RotateCw className="w-8 h-8 mx-auto mb-2 text-gray-600" />
           <div className="text-2xl font-bold text-gray-600">{syncStatus.totalItems}</div>
           <div className="text-sm text-gray-600">Total</div>
         </div>
@@ -150,7 +150,7 @@ export default function SyncStatus({ compact = false }: SyncStatusProps) {
           {isLoading ? (
             <RefreshCw size={16} className="animate-spin" />
           ) : (
-            <Sync size={16} />
+            <RotateCw size={16} />
           )}
           {isLoading ? 'Syncing...' : 'Force Sync Now'}
         </Button>

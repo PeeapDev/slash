@@ -342,7 +342,15 @@ export default function ProjectManagement() {
   )
 }
 
-function ProjectFormModal({ project, regions, projectTypes, onSave, onClose }) {
+interface ProjectFormModalProps {
+  project?: any
+  regions: any[]
+  projectTypes: any[]
+  onSave: (project: any) => void
+  onClose: () => void
+}
+
+function ProjectFormModal({ project, regions, projectTypes, onSave, onClose }: ProjectFormModalProps) {
   const [formData, setFormData] = useState(
     project || {
       name: "",
