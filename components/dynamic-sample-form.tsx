@@ -463,9 +463,17 @@ export default function DynamicSampleForm({
 
   const getAvailableSampleTypes = () => {
     if (!selectedProject) return []
-    return sampleTypes.filter(st => 
-      selectedProject.expected_sample_types.includes(st.type_code)
-    )
+    
+    // If project has specific sample types configured, use those
+    // Otherwise, show all active sample types from Settings
+    if (selectedProject.expected_sample_types && selectedProject.expected_sample_types.length > 0) {
+      return sampleTypes.filter(st => 
+        selectedProject.expected_sample_types.includes(st.type_code)
+      )
+    }
+    
+    // Show all sample types configured in Settings > Sample Types
+    return sampleTypes
   }
 
   return (
@@ -524,14 +532,25 @@ export default function DynamicSampleForm({
                 <SelectValue placeholder="Select sample type" />
               </SelectTrigger>
               <SelectContent>
-                {getAvailableSampleTypes().map((sampleType) => (
-                  <SelectItem key={sampleType.type_code} value={sampleType.type_code}>
-                    {sampleType.display_name}
-                  </SelectItem>
-                ))}
+                {getAvailableSampleTypes().length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    No sample types configured. Go to Settings → Sample Types to add sample types.
+                  </div>
+                ) : (
+                  getAvailableSampleTypes().map((sampleType) => (
+                    <SelectItem key={sampleType.type_code} value={sampleType.type_code}>
+                      {sampleType.display_name}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
             {errors.sampleType && <p className="text-red-500 text-sm">{errors.sampleType}</p>}
+            {getAvailableSampleTypes().length > 0 && (
+              <p className="text-xs text-muted-foreground">
+                {getAvailableSampleTypes().length} sample type(s) available from Settings
+              </p>
+            )}
             
             {selectedSampleType && (
               <div className="p-3 bg-muted rounded-lg">
