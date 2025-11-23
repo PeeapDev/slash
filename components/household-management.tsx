@@ -113,7 +113,15 @@ export default function HouseholdManagement() {
       
       const localProjects = await offlineDB.getAll('project_metadata')
       console.log(`✅ Loaded ${localProjects.length} projects from IndexedDB`)
-      setProjects(localProjects)
+      
+      // Map IndexedDB project_metadata structure to Project interface
+      const formattedProjects = localProjects.map((project: any) => ({
+        id: project.projectId || project.id,
+        name: project.projectName || project.name,
+        projectCode: project.projectCode || project.code
+      }))
+      
+      setProjects(formattedProjects)
       
       if (localProjects.length === 0) {
         console.log('ℹ️ No projects found - create projects first to assign households')
