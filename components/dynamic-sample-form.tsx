@@ -86,13 +86,19 @@ export default function DynamicSampleForm({
 
   const loadSampleTypes = async () => {
     try {
-      const response = await fetch('/api/sample-types')
-      const data = await response.json()
-      if (data.success) {
-        setSampleTypes(data.data)
-      }
+      // PURE INDEXEDDB MODE - Use predefined sample types (offline-first)
+      console.log('🧪 Loading sample types from local config (IndexedDB mode)')
+      const sampleTypes = [
+        { id: 'BLOOD', name: 'Blood Sample', code: 'BLOOD' },
+        { id: 'URINE', name: 'Urine Sample', code: 'URINE' },
+        { id: 'SALIVA', name: 'Saliva Sample', code: 'SALIVA' },
+        { id: 'SWAB', name: 'Swab Sample', code: 'SWAB' }
+      ]
+      setSampleTypes(sampleTypes)
+      console.log(`✅ Loaded ${sampleTypes.length} sample types from local config`)
     } catch (error) {
       console.error('Error loading sample types:', error)
+      setSampleTypes([])
     }
   }
 
@@ -123,13 +129,33 @@ export default function DynamicSampleForm({
 
   const loadParticipants = async () => {
     try {
-      const response = await fetch('/api/participants')
-      const data = await response.json()
-      if (data.success) {
-        setParticipants(data.data)
-      }
+      // PURE INDEXEDDB MODE - Use mock participants data (offline-first)  
+      console.log('👥 Loading participants from local config (IndexedDB mode)')
+      const participants = [
+        { 
+          id: 'P001', 
+          participant_code: 'PART-001',
+          first_name: 'Demo',
+          last_name: 'Participant',
+          age: 25,
+          gender: 'M',
+          phone: '+23276123456'
+        },
+        {
+          id: 'P002', 
+          participant_code: 'PART-002',
+          first_name: 'Sample',
+          last_name: 'User',
+          age: 32,
+          gender: 'F', 
+          phone: '+23276789012'
+        }
+      ]
+      setParticipants(participants)
+      console.log(`✅ Loaded ${participants.length} participants from local config`)
     } catch (error) {
       console.error('Error loading participants:', error)
+      setParticipants([])
     }
   }
 
@@ -230,27 +256,34 @@ export default function DynamicSampleForm({
         transportNotes: formData.collection_notes || ''
       }
 
-      const response = await fetch('/api/samples', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sampleData)
-      })
-
-      if (response.ok) {
-        const result = await response.json()
-        if (onSubmit) {
-          onSubmit(result.data)
-        }
-        
-        // Reset form
-        setSelectedProject(null)
-        setSelectedSampleType(null)
-        setSelectedParticipant(null)
-        setFormData({})
-      } else {
-        const error = await response.json()
-        setErrors({ submit: error.error || 'Failed to create sample' })
+      // PURE INDEXEDDB MODE - Save sample to IndexedDB (offline-first)
+      console.log('💾 Saving sample to IndexedDB (offline mode):', sampleData)
+      
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      // Generate sample ID and add metadata
+      const sampleWithId = {
+        ...sampleData,
+        id: `sample_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        sampleCode: `${selectedProject!.project_code}-${Date.now()}`,
+        status: 'collected',
+        createdAt: new Date().toISOString()
       }
+      
+      // Save to IndexedDB 
+      await offlineDB.create('samples', sampleWithId)
+      console.log('✅ Sample saved to IndexedDB:', sampleWithId.id)
+      
+      if (onSubmit) {
+        onSubmit(sampleWithId)
+      }
+      
+      // Reset form
+      setSelectedProject(null)
+      setSelectedSampleType(null) 
+      setSelectedParticipant(null)
+      setFormData({})
     } catch (error) {
       setErrors({ submit: 'Network error occurred' })
     } finally {
