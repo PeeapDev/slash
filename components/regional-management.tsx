@@ -86,11 +86,11 @@ export default function RegionalManagement() {
         <div className="divide-y divide-border">
           {regions.map((region) => (
             <div key={region.id}>
-              <button
-                onClick={() => toggleExpand(region.id)}
-                className="w-full p-6 hover:bg-muted flex items-center justify-between transition-colors"
-              >
-                <div className="flex items-center gap-4 flex-1">
+              <div className="w-full p-6 hover:bg-muted flex items-center justify-between transition-colors">
+                <div 
+                  className="flex items-center gap-4 flex-1 cursor-pointer"
+                  onClick={() => toggleExpand(region.id)}
+                >
                   <ChevronDown size={20} className={`transition-transform ${region.expanded ? "rotate-180" : ""}`} />
                   <div className="text-left">
                     <div className="font-semibold">{region.name}</div>
@@ -106,15 +106,27 @@ export default function RegionalManagement() {
                     {region.status}
                   </span>
                   <div className="flex gap-1">
-                    <button className="p-1 hover:bg-muted rounded">
+                    <button 
+                      className="p-1 hover:bg-muted rounded"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Edit functionality would go here
+                      }}
+                    >
                       <Edit2 size={16} />
                     </button>
-                    <button className="p-1 hover:bg-muted rounded">
+                    <button 
+                      className="p-1 hover:bg-muted rounded"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Delete functionality would go here
+                      }}
+                    >
                       <Trash2 size={16} className="text-red-600" />
                     </button>
                   </div>
                 </div>
-              </button>
+              </div>
 
               {region.expanded && (
                 <div className="bg-muted/50 p-6 border-t border-border">

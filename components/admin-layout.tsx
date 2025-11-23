@@ -29,13 +29,24 @@ import UnifiedDashboard from "@/components/unified-dashboard"
 interface AdminLayoutProps {
   user: any
   onLogout: () => void
-  currentPage: string
-  onPageChange: (page: string) => void
+  currentPage?: string
+  onPageChange?: (page: string) => void
   children?: React.ReactNode
 }
 
 export default function AdminLayout({ user, onLogout, currentPage, onPageChange }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  // Internal page state fallback when onPageChange/currentPage are not provided
+  const [internalPage, setInternalPage] = useState<string>(currentPage || "dashboard")
+  const page = currentPage ?? internalPage
+  console.log('🧭 AdminLayout props:', { hasOnPageChange: typeof onPageChange, currentPage, internalPage, page })
+  const changePage = (pageId: string) => {
+    if (typeof onPageChange === 'function') {
+      onPageChange(pageId)
+    } else {
+      setInternalPage(pageId)
+    }
+  }
 
   const adminMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: "📊" },
@@ -54,7 +65,7 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
   ]
 
   const renderPage = () => {
-    switch (currentPage) {
+    switch (page) {
       case "dashboard":
         return <UnifiedDashboard />
       case "form-builder":
@@ -107,9 +118,9 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
           {adminMenuItems.map((item) => (
             <button
               key={item.id}
-              onClick={() => onPageChange(item.id)}
+              onClick={() => changePage(item.id)}
               className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left text-sm font-medium transition-colors ${
-                currentPage === item.id ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
+                page === item.id ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
               }`}
             >
               <span className="text-xl">{item.icon}</span>

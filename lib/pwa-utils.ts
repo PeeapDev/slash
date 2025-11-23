@@ -24,6 +24,18 @@ class PWAManager {
     registration: null
   }
 
+  // Unregister any active service workers (useful in development)
+  async unregisterAllServiceWorkers(): Promise<void> {
+    if (!('serviceWorker' in navigator)) return
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((r) => r.unregister()))
+      console.log('PWA: Unregistered all service workers')
+    } catch (error) {
+      console.warn('PWA: Failed to unregister service workers:', error)
+    }
+  }
+
   private listeners: Array<(state: PWAState) => void> = []
   private installPromptEvent: InstallPromptEvent | null = null
 
@@ -36,6 +48,20 @@ class PWAManager {
   }
 
   private async initializePWA() {
+    // Disable PWA service worker in development/local to avoid dev chunk caching issues
+    const isDev = typeof process !== 'undefined' && process.env.NODE_ENV !== 'production'
+    const hostname = typeof window !== 'undefined' ? window.location.hostname : ''
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1'
+    if (isDev || isLocalhost) {
+      console.log('PWA: Disabled in development/local environment')
+      try {
+        await this.unregisterAllServiceWorkers()
+        await this.clearCache()
+      } catch (err) {
+        console.warn('PWA: Cleanup error (ignored in dev):', err)
+      }
+      return
+    }
     // Check if already installed
     this.state.isInstalled = this.isRunningStandalone()
 

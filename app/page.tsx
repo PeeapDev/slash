@@ -45,6 +45,12 @@ export default function Home() {
     return <LoginPage onLogin={handleLogin} />
   }
 
+  console.log('🚀 Page.tsx: Rendering AdminLayout with props:', {
+    user: user?.name,
+    currentPage,
+    hasOnPageChange: typeof setCurrentPage === 'function'
+  })
+
   return (
     <div className="min-h-screen bg-background">
       <AdminLayout 
