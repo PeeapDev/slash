@@ -4,14 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
-import {
-  getSurveys,
-  addSurvey,
-  updateSurvey,
-  deleteSurvey,
-  getHouseholds,
-  getParticipants,
-} from "@/lib/admin-data-store"
+// Removed admin-data-store - now using IndexedDB-first approach
 
 export default function SurveyManagement() {
   const [surveys, setSurveys] = useState([])
@@ -22,9 +15,10 @@ export default function SurveyManagement() {
   const [filterStatus, setFilterStatus] = useState("all")
 
   useEffect(() => {
-    setSurveys(getSurveys())
-    setHouseholds(getHouseholds())
-    setParticipants(getParticipants())
+    // TODO: Load surveys, households, and participants from IndexedDB
+    setSurveys([])
+    setHouseholds([])
+    setParticipants([])
   }, [])
 
   const handleAddSurvey = (formData) => {

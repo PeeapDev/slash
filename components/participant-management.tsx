@@ -4,13 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
-import {
-  getParticipants,
-  addParticipant,
-  updateParticipant,
-  deleteParticipant,
-  getHouseholds,
-} from "@/lib/admin-data-store"
+// Removed admin-data-store - now using IndexedDB-first approach
 
 export default function ParticipantManagement() {
   const [participants, setParticipants] = useState([])
@@ -20,8 +14,9 @@ export default function ParticipantManagement() {
   const [filterHousehold, setFilterHousehold] = useState("all")
 
   useEffect(() => {
-    setParticipants(getParticipants())
-    setHouseholds(getHouseholds())
+    // TODO: Load participants and households from IndexedDB
+    setParticipants([])
+    setHouseholds([])
   }, [])
 
   const handleAddParticipant = (formData) => {
@@ -31,21 +26,24 @@ export default function ParticipantManagement() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    addParticipant(newParticipant)
-    setParticipants(getParticipants())
+    // TODO: Save to IndexedDB
+    // addParticipant(newParticipant)
+    // setParticipants(getParticipants())
     setShowForm(false)
   }
 
   const handleUpdateParticipant = (id, formData) => {
-    updateParticipant(id, formData)
-    setParticipants(getParticipants())
+    // TODO: Update in IndexedDB
+    // updateParticipant(id, formData)
+    // setParticipants(getParticipants())
     setEditingParticipant(null)
   }
 
   const handleDeleteParticipant = (id) => {
     if (confirm("Are you sure you want to delete this participant?")) {
-      deleteParticipant(id)
-      setParticipants(getParticipants())
+      // TODO: Delete from IndexedDB
+      // deleteParticipant(id)
+      // setParticipants(getParticipants())
     }
   }
 

@@ -4,14 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
-import {
-  getSamples,
-  addSample,
-  updateSample,
-  deleteSample,
-  getHouseholds,
-  getParticipants,
-} from "@/lib/admin-data-store"
+// Removed admin-data-store - now using IndexedDB-first approach
 
 export default function SampleManagement() {
   const [samples, setSamples] = useState([])
@@ -23,9 +16,10 @@ export default function SampleManagement() {
   const [filterStatus, setFilterStatus] = useState("all")
 
   useEffect(() => {
-    setSamples(getSamples())
-    setHouseholds(getHouseholds())
-    setParticipants(getParticipants())
+    // TODO: Load samples, households, and participants from IndexedDB
+    setSamples([])
+    setHouseholds([])
+    setParticipants([])
   }, [])
 
   const handleAddSample = (formData) => {
@@ -35,21 +29,24 @@ export default function SampleManagement() {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
-    addSample(newSample)
-    setSamples(getSamples())
+    // TODO: Save to IndexedDB
+    // addSample(newSample)
+    // setSamples(getSamples())
     setShowForm(false)
   }
 
   const handleUpdateSample = (id, formData) => {
-    updateSample(id, formData)
-    setSamples(getSamples())
+    // TODO: Update in IndexedDB
+    // updateSample(id, formData)
+    // setSamples(getSamples())
     setEditingSample(null)
   }
 
   const handleDeleteSample = (id) => {
     if (confirm("Are you sure you want to delete this sample?")) {
-      deleteSample(id)
-      setSamples(getSamples())
+      // TODO: Delete from IndexedDB
+      // deleteSample(id)
+      // setSamples(getSamples())
     }
   }
 

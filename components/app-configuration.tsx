@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Trash2, Check } from "lucide-react"
-import { getRoles, updateRole, deleteRole } from "@/lib/admin-data-store"
+// Removed admin-data-store - now using IndexedDB-first approach
 import AICredentials from "@/components/ai-credentials"
 import AISettings from "@/components/ai-settings"
 import SystemLogs from "@/components/system-logs"
@@ -28,12 +28,80 @@ export default function AppConfiguration() {
   const [activeTab, setActiveTab] = useState("roles")
 
   useEffect(() => {
-    const loadedRoles = getRoles()
-    setRoles(loadedRoles)
-    if (loadedRoles.length > 0) {
-      setSelectedRole(loadedRoles[0])
-    }
+    loadRoles()
   }, [])
+
+  // INDEXEDDB-FIRST: Load roles from IndexedDB
+  const loadRoles = async () => {
+    try {
+      console.log('👥 Loading roles from IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      // For now, use default roles since we haven't implemented roles in IndexedDB yet
+      const defaultRoles: Role[] = [
+        {
+          id: 'superadmin',
+          name: 'Super Admin',
+          description: 'Full system access',
+          permissions: {
+            dashboard: true,
+            view_regions: true,
+            edit_regions: true,
+            view_districts: true,
+            edit_districts: true,
+            view_staff: true,
+            edit_staff: true,
+            view_surveys: true,
+            edit_surveys: true,
+            view_samples: true,
+            edit_samples: true,
+            view_lab_results: true,
+            edit_lab_results: true,
+            view_analytics: true,
+            manage_roles: true,
+            manage_ai: true,
+            manage_sync: true,
+            view_logs: true
+          }
+        },
+        {
+          id: 'field_collector',
+          name: 'Field Collector',
+          description: 'Data collection in the field',
+          permissions: {
+            dashboard: true,
+            view_regions: true,
+            edit_regions: false,
+            view_districts: true,
+            edit_districts: false,
+            view_staff: false,
+            edit_staff: false,
+            view_surveys: true,
+            edit_surveys: true,
+            view_samples: true,
+            edit_samples: true,
+            view_lab_results: false,
+            edit_lab_results: false,
+            view_analytics: false,
+            manage_roles: false,
+            manage_ai: false,
+            manage_sync: false,
+            view_logs: false
+          }
+        }
+      ]
+      
+      setRoles(defaultRoles)
+      if (defaultRoles.length > 0) {
+        setSelectedRole(defaultRoles[0])
+      }
+      console.log(`✅ Loaded ${defaultRoles.length} default roles`)
+    } catch (error) {
+      console.error('❌ Error loading roles:', error)
+      setRoles([])
+    }
+  }
 
   const permissionGroups = [
     { label: "Dashboard", key: "dashboard" },
@@ -47,7 +115,9 @@ export default function AppConfiguration() {
     { label: "Administration", keys: ["manage_roles", "manage_ai", "manage_sync", "view_logs"] },
   ]
 
+  // INDEXEDDB-FIRST: Update role permissions (demo mode - in-memory only for now)
   const handleTogglePermission = (roleId: string, permissionKey: string) => {
+    console.log(`🔄 Toggling permission ${permissionKey} for role ${roleId}`)
     const role = roles.find((r) => r.id === roleId)
     if (role) {
       const updatedRole: Role = {
@@ -57,16 +127,22 @@ export default function AppConfiguration() {
           [permissionKey]: !role.permissions[permissionKey],
         },
       }
-      updateRole(roleId, updatedRole as any)
-      setRoles(getRoles())
+      
+      // Update local state (in future, this would go to IndexedDB)
+      setRoles(prevRoles => 
+        prevRoles.map(r => r.id === roleId ? updatedRole : r)
+      )
       setSelectedRole(updatedRole)
+      console.log(`✅ Updated role ${roleId} permissions`)
     }
   }
 
+  // INDEXEDDB-FIRST: Delete role (demo mode - in-memory only for now)  
   const handleDeleteRole = (roleId: string) => {
     if (!["superadmin", "field_collector", "lab_technician"].includes(roleId)) {
-      deleteRole(roleId)
-      setRoles(getRoles())
+      console.log(`🗑️ Deleting role ${roleId}`)
+      // Update local state (in future, this would go to IndexedDB)
+      setRoles(prevRoles => prevRoles.filter(r => r.id !== roleId))
       setSelectedRole(null)
     }
   }

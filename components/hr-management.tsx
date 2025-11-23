@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2, Eye } from "lucide-react"
-import { getStaff, addStaff, updateStaff, deleteStaff, getRoles } from "@/lib/admin-data-store"
+// Removed admin-data-store - now using IndexedDB-first approach
 import { generateId } from "@/lib/utils"
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
 
@@ -24,8 +24,9 @@ export default function HRManagement() {
   })
 
   useEffect(() => {
-    setStaff(getStaff())
-    setRoles(getRoles())
+    // TODO: Load staff and roles from IndexedDB
+    setStaff([])
+    setRoles([])
     setRegions(SIERRA_LEONE_REGIONS)
   }, [])
 

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Trash2, Check } from "lucide-react"
-import { getRoles, updateRole, deleteRole } from "@/lib/admin-data-store"
+// Removed admin-data-store - now using IndexedDB-first approach
 
 export default function RoleManagement() {
   const [roles, setRoles] = useState([])
@@ -13,7 +13,8 @@ export default function RoleManagement() {
   const [editingRole, setEditingRole] = useState(null)
 
   useEffect(() => {
-    setRoles(getRoles())
+    // TODO: Load roles from IndexedDB
+    setRoles([])
   }, [])
 
   const permissionGroups = [
