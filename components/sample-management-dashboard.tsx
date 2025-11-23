@@ -73,43 +73,62 @@ export default function SampleManagementDashboard() {
   const loadSamples = async () => {
     setIsLoading(true)
     try {
-      // PURE INDEXEDDB MODE - No external API calls
-      console.log('🧪 Sample Management: Pure IndexedDB mode - using mock/local data')
+      // OFFLINE-FIRST: Load samples from IndexedDB
+      console.log('🧪 Loading samples from IndexedDB...')
       
-      // Mock data for demo purposes
-      setSamples([
-        {
-          id: 'S001',
-          participantId: 'P001',
-          sampleCode: 'SAMPLE-001',
-          sampleType: 'BLOOD',
-          status: 'collected',
-          collectedAt: new Date().toISOString(),
-          collectedBy: 'Field Collector 1'
-        }
-      ])
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localSamples = await offlineDB.getAll('samples')
+      console.log(`✅ Loaded ${localSamples.length} samples from IndexedDB`)
+      
+      // Format for dashboard compatibility
+      const formattedSamples = localSamples.map((s: any) => ({
+        id: s.id,
+        participantId: s.participantId,
+        sampleCode: s.sampleCode,
+        sampleType: s.sampleType,
+        status: s.status || 'collected',
+        collectedAt: s.collectionTimestamp || s.createdAt,
+        collectedBy: s.collectorId,
+        syncStatus: s.syncStatus
+      }))
+      
+      setSamples(formattedSamples)
+      
+      if (localSamples.length === 0) {
+        console.log('ℹ️ No samples found in IndexedDB - collect samples to see them here')
+      }
     } catch (error) {
-      console.error('Error loading samples:', error)
+      console.error('❌ Error loading samples from IndexedDB:', error)
       setSamples([])
     } finally {
       setIsLoading(false)
     }
   }
 
-  // Load dashboard statistics
+  // Load dashboard statistics from IndexedDB
   const loadStats = async () => {
     try {
-      // PURE INDEXEDDB MODE - Use mock stats
-      console.log('📊 Sample Analytics: Pure IndexedDB mode - using mock stats')
+      // OFFLINE-FIRST: Calculate stats from IndexedDB samples
+      console.log('📊 Calculating sample statistics from IndexedDB...')
       
-      setStats({
-        totalSamples: 1,
-        pendingSamples: 0,
-        completedSamples: 1,
-        rejectedSamples: 0
-      })
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localSamples = await offlineDB.getAll('samples')
+      
+      const stats = {
+        totalSamples: localSamples.length,
+        pendingSamples: localSamples.filter((s: any) => s.syncStatus === 'pending').length,
+        completedSamples: localSamples.filter((s: any) => s.status === 'completed' || s.syncStatus === 'synced').length,
+        rejectedSamples: localSamples.filter((s: any) => s.status === 'rejected').length
+      }
+      
+      setStats(stats)
+      console.log('✅ Sample statistics calculated:', stats)
     } catch (error) {
-      console.error('Error loading stats:', error)
+      console.error('❌ Error calculating stats from IndexedDB:', error)
     }
   }
 
@@ -154,18 +173,31 @@ export default function SampleManagementDashboard() {
 
   const handleStatusUpdate = async (sampleId: string, newStatus: string) => {
     try {
-      // PURE INDEXEDDB MODE - Update local state only
-      console.log(`🔄 Sample Status Update: ${sampleId} -> ${newStatus} (IndexedDB mode)`)
+      // OFFLINE-FIRST: Update sample in IndexedDB + Sync Queue
+      console.log(`🔄 Updating sample status: ${sampleId} -> ${newStatus}`)
       
-      // Update local samples state
-      setSamples(prev => prev.map(sample => 
-        sample.id === sampleId ? { ...sample, status: newStatus } : sample
-      ))
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
       
-      // Refresh stats
-      loadStats()
+      // Update sample in IndexedDB
+      const existingSample = await offlineDB.getById('samples', sampleId)
+      if (existingSample) {
+        const updatedSample = {
+          ...existingSample,
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'pending' // Mark for sync to cloud
+        }
+        
+        await offlineDB.update('samples', sampleId, updatedSample)
+        console.log('✅ Sample updated in IndexedDB + added to sync queue')
+        
+        // Refresh data from IndexedDB
+        loadSamples()
+        loadStats()
+      }
     } catch (error) {
-      console.error('Error updating sample status:', error)
+      console.error('❌ Error updating sample status:', error)
     }
   }
 

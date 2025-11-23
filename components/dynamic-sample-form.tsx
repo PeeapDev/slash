@@ -192,32 +192,33 @@ export default function DynamicSampleForm({
 
   const loadParticipants = async () => {
     try {
-      // PURE INDEXEDDB MODE - Use mock participants data (offline-first)  
-      console.log('👥 Loading participants from local config (IndexedDB mode)')
-      const participants = [
-        { 
-          id: 'P001', 
-          participant_code: 'PART-001',
-          first_name: 'Demo',
-          last_name: 'Participant',
-          age: 25,
-          gender: 'M',
-          phone: '+23276123456'
-        },
-        {
-          id: 'P002', 
-          participant_code: 'PART-002',
-          first_name: 'Sample',
-          last_name: 'User',
-          age: 32,
-          gender: 'F', 
-          phone: '+23276789012'
-        }
-      ]
-      setParticipants(participants)
-      console.log(`✅ Loaded ${participants.length} participants from local config`)
+      // OFFLINE-FIRST: Read participants from IndexedDB
+      console.log('👥 Loading participants from IndexedDB...')
+      
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localParticipants = await offlineDB.getAll('participants')
+      console.log(`✅ Loaded ${localParticipants.length} participants from IndexedDB`)
+      
+      // Format for form compatibility
+      const formattedParticipants = localParticipants.map((p: any) => ({
+        id: p.id,
+        participant_code: p.participantCode || p.participant_code,
+        first_name: p.firstName || p.first_name,
+        last_name: p.lastName || p.last_name,
+        age: p.age,
+        gender: p.gender,
+        phone: p.phone
+      }))
+      
+      setParticipants(formattedParticipants)
+      
+      if (localParticipants.length === 0) {
+        console.log('ℹ️ No participants found in IndexedDB - add participants through the Participants module')
+      }
     } catch (error) {
-      console.error('❌ Error loading participants:', error)
+      console.error('❌ Error loading participants from IndexedDB:', error)
       setParticipants([])
     }
   }
@@ -319,24 +320,38 @@ export default function DynamicSampleForm({
         transportNotes: formData.collection_notes || ''
       }
 
-      // PURE INDEXEDDB MODE - Save sample to IndexedDB (offline-first)
-      console.log('💾 Saving sample to IndexedDB (offline mode):', sampleData)
+      // OFFLINE-FIRST: Save sample to IndexedDB + Sync Queue
+      console.log('💾 Saving sample to IndexedDB (offline-first)...')
       
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
       
-      // Generate sample ID and add metadata
+      // Generate sample with proper BaseRecord structure
       const sampleWithId = {
-        ...sampleData,
         id: `sample_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        sampleId: `${selectedProject!.project_code}-${Date.now()}`,
+        participantId: selectedParticipant!.id,
+        householdId: '', // Will be populated when households are linked
+        sampleType: selectedSampleType!.type_code,
         sampleCode: `${selectedProject!.project_code}-${Date.now()}`,
+        collectionTimestamp: new Date().toISOString(),
+        collectorId: currentUser.id,
+        chainOfCustody: [],
+        storageCondition: 'room_temperature',
+        volume: formData.volume_collected ? parseFloat(formData.volume_collected) : undefined,
+        containerType: formData.container_type || 'standard',
         status: 'collected',
-        createdAt: new Date().toISOString()
+        customFields: formData, // Store all form data
+        projectId: selectedProject!.id,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending', // Will sync to cloud when online
+        version: 1
       }
       
-      // Save to IndexedDB 
+      // Save to IndexedDB - automatically adds to sync queue
       await offlineDB.create('samples', sampleWithId)
-      console.log('✅ Sample saved to IndexedDB:', sampleWithId.id)
+      console.log('✅ Sample saved to IndexedDB + added to sync queue:', sampleWithId.id)
       
       if (onSubmit) {
         onSubmit(sampleWithId)
