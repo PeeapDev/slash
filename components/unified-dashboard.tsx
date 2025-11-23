@@ -12,28 +12,18 @@ export default function UnifiedDashboard() {
   const tabs = [
     {
       id: "traditional",
-      label: "Overview Dashboard",
-      icon: BarChart3,
-      description: "Traditional analytics and metrics"
+      label: "Overview",
+      icon: BarChart3
     },
     {
       id: "ai",
       label: "AI Analytics",
-      icon: Brain,
-      description: "AI-powered insights and analysis"
+      icon: Brain
     }
   ]
 
   return (
-    <div className="space-y-6">
-      <div>
-        <div className="text-sm text-muted-foreground">Admin / Dashboard</div>
-        <h1 className="text-2xl font-bold mt-1">Analytics Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Comprehensive data insights and AI-powered analytics
-        </p>
-      </div>
-
+    <div className="space-y-4">
       {/* Dashboard Tabs */}
       <div className="border-b border-border">
         <div className="flex space-x-8">
@@ -43,7 +33,7 @@ export default function UnifiedDashboard() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`flex items-center gap-2 py-3 px-1 border-b-2 font-medium text-sm transition-colors ${
                   activeTab === tab.id
                     ? "border-primary text-foreground"
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground"
@@ -54,13 +44,6 @@ export default function UnifiedDashboard() {
               </button>
             )
           })}
-        </div>
-        
-        {/* Tab Description */}
-        <div className="py-3 px-1">
-          <p className="text-xs text-muted-foreground">
-            {tabs.find(tab => tab.id === activeTab)?.description}
-          </p>
         </div>
       </div>
 

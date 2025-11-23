@@ -303,12 +303,14 @@ export interface LabResult extends BaseRecord {
   labId?: string
 }
 
-// Team Member Interface (imported from team-roles)
+// Team Member Interface (Staff Directory)
 export interface TeamMemberDB extends BaseRecord {
   userId: string
   email: string
   fullName: string
   phone?: string
+  gender?: 'male' | 'female' | 'other'
+  address?: string
   role: string
   regionId?: string
   districtId?: string
@@ -322,6 +324,20 @@ export interface TeamMemberDB extends BaseRecord {
   permissions: any
 }
 
+// Team Interface (Project-based teams)
+export interface Team extends BaseRecord {
+  teamName: string
+  projectId: string
+  projectName: string
+  description?: string
+  leaderId: string // Staff member ID
+  memberIds: string[] // Array of staff member IDs
+  regionId?: string
+  districtId?: string
+  isActive: boolean
+  createdBy: string
+}
+
 // IndexedDB Schema Definition
 export interface OfflineDBSchema {
   households: Household[]
@@ -331,6 +347,7 @@ export interface OfflineDBSchema {
   sample_types: SampleType[]
   lab_results: LabResult[]
   team_members: TeamMemberDB[]
+  teams: Team[]
   forms: Form[]
   form_responses: FormResponse[]
   project_metadata: ProjectMetadata[]
@@ -342,7 +359,7 @@ export interface OfflineDBSchema {
 // Offline-First Database Service
 class OfflineFirstDB {
   private dbName = 'SLASH_FIELDWORK_DB'
-  private dbVersion = 5 // Increased for lab_results and team_members stores
+  private dbVersion = 6 // Increased for teams store, gender, and address fields
   private db: IDBDatabase | null = null
   private deviceId: string
   private collectorId: string
@@ -379,7 +396,7 @@ class OfflineFirstDB {
         const storeNames = [
           'households', 'participants', 'surveys', 'samples',
           'forms', 'form_responses', 'project_metadata',
-          'sample_types', 'lab_results', 'team_members',
+          'sample_types', 'lab_results', 'team_members', 'teams',
           'sync_queue', 'audit_trails', 'settings'
         ]
 
@@ -425,6 +442,12 @@ class OfflineFirstDB {
               store.createIndex('isActive', 'isActive')
               store.createIndex('regionId', 'regionId')
               store.createIndex('districtId', 'districtId')
+              store.createIndex('gender', 'gender')
+            } else if (storeName === 'teams') {
+              store.createIndex('projectId', 'projectId')
+              store.createIndex('leaderId', 'leaderId')
+              store.createIndex('isActive', 'isActive')
+              store.createIndex('regionId', 'regionId')
             }
           }
         })

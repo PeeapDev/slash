@@ -21,6 +21,8 @@ export default function HRManagement() {
     name: "",
     email: "",
     phone: "",
+    gender: "" as 'male' | 'female' | 'other' | '',
+    address: "",
     role: "",
     region: "",
     employmentType: "full-time",
@@ -91,11 +93,11 @@ export default function HRManagement() {
 
   // INDEXEDDB-FIRST: Add staff to team_members store with default password
   const handleAddStaff = async () => {
-    if (formData.name && formData.email && formData.role) {
-      if (formData.role === "supervisor" && !formData.region) {
+    if (formData.name && formData.email && formData.gender && formData.region && formData.role) {
+      if ((formData.role === "supervisor" || formData.role === "regional_head") && !formData.region) {
         toast({
           title: "Region Required",
-          description: "Supervisors must be assigned to a region",
+          description: "Supervisors and Regional Heads must be assigned to a region",
           variant: "destructive",
           duration: 3000,
         })
@@ -116,6 +118,8 @@ export default function HRManagement() {
           fullName: formData.name,
           email: formData.email,
           phone: formData.phone,
+          gender: formData.gender || undefined,
+          address: formData.address || undefined,
           role: formData.role,
           regionId: formData.region || undefined,
           districtId: undefined,
@@ -151,6 +155,8 @@ export default function HRManagement() {
           name: "",
           email: "",
           phone: "",
+          gender: "" as 'male' | 'female' | 'other' | '',
+          address: "",
           role: "",
           region: "",
           employmentType: "full-time",
@@ -168,7 +174,7 @@ export default function HRManagement() {
     } else {
       toast({
         title: "Missing Required Fields",
-        description: "Please fill in Name, Email, and Role.",
+        description: "Please fill in Name, Email, Gender, Region, and Role.",
         variant: "destructive",
         duration: 3000,
       })
@@ -340,9 +346,44 @@ export default function HRManagement() {
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
             />
+            
+            <select
+              value={formData.gender}
+              onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'male' | 'female' | 'other' })}
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
+              required
+            >
+              <option value="">Select Gender *</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
+
+            <input
+              type="text"
+              placeholder="Address"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600 md:col-span-2"
+            />
+            
+            <select
+              value={formData.region}
+              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
+              className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
+              required
+            >
+              <option value="">Select Region *</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.name}
+                </option>
+              ))}
+            </select>
+            
             <select
               value={formData.role}
-              onChange={(e) => setFormData({ ...formData, role: e.target.value, region: "" })}
+              onChange={(e) => setFormData({ ...formData, role: e.target.value })}
               className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
               required
             >
@@ -355,19 +396,9 @@ export default function HRManagement() {
             </select>
 
             {(formData.role === "supervisor" || formData.role === "regional_head") && (
-              <select
-                value={formData.region}
-                onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-red-600 border-red-300"
-                required
-              >
-                <option value="">Select Region (Required for Supervisors/Regional Heads)</option>
-                {regions.map((region) => (
-                  <option key={region.id} value={region.id}>
-                    {region.name}
-                  </option>
-                ))}
-              </select>
+              <div className="md:col-span-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded text-xs text-yellow-700 dark:text-yellow-300">
+                ℹ️ Note: Supervisors and Regional Heads require region assignment above
+              </div>
             )}
 
             <select

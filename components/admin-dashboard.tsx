@@ -19,8 +19,7 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { offlineDB, type Household, type Participant, type Sample, type LabResult, type AuditTrail } from "@/lib/offline-first-db"
-import { getProjects, type Project } from "@/lib/admin-data-store"
+import { offlineDB, type Household, type Participant, type Sample, type LabResult, type AuditTrail, type ProjectMetadata } from "@/lib/offline-first-db"
 
 export default function AdminDashboard() {
   const [households, setHouseholds] = useState<Household[]>([])
@@ -28,7 +27,7 @@ export default function AdminDashboard() {
   const [samples, setSamples] = useState<Sample[]>([])
   const [labResults, setLabResults] = useState<LabResult[]>([])
   const [auditTrails, setAuditTrails] = useState<AuditTrail[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
+  const [projects, setProjects] = useState<ProjectMetadata[]>([])
   const [syncQueue, setSyncQueue] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -48,7 +47,7 @@ export default function AdminDashboard() {
         offlineDB.getAll<Sample>('samples'),
         offlineDB.getAll<LabResult>('lab_results'),
         offlineDB.getAll<AuditTrail>('audit_trails'),
-        Promise.resolve(getProjects()),
+        offlineDB.getAll<ProjectMetadata>('project_metadata'),
         offlineDB.getAll('sync_queue')
       ])
       
@@ -117,7 +116,8 @@ export default function AdminDashboard() {
     const dayStart = new Date(date.setHours(0, 0, 0, 0)).getTime()
     const dayEnd = new Date(date.setHours(23, 59, 59, 999)).getTime()
     
-    const dayQueue = syncQueue.filter(q => {
+    const dayQueue = (syncQueue || []).filter(q => {
+      if (!q?.createdAt) return false
       const qTime = new Date(q.createdAt).getTime()
       return qTime >= dayStart && qTime <= dayEnd
     })
@@ -130,9 +130,9 @@ export default function AdminDashboard() {
   })
 
   // Calculate lab results status
-  const completedResults = labResults.filter(r => r.status === 'completed' || r.status === 'reviewed').length
-  const pendingResults = samples.filter(s => !labResults.some(l => l.sampleId === s.id)).length
-  const inReviewResults = labResults.filter(r => r.status === 'needs_review' || r.status === 'flagged').length
+  const completedResults = (labResults || []).filter(r => r.status === 'completed' || r.status === 'reviewed').length
+  const pendingResults = (samples || []).filter(s => !(labResults || []).some(l => l.sampleId === s.id)).length
+  const inReviewResults = (labResults || []).filter(r => r.status === 'needs_review' || r.status === 'flagged').length
   
   const labResultsData = [
     { name: "Completed", value: completedResults, color: "#10b981" },
@@ -141,7 +141,7 @@ export default function AdminDashboard() {
   ].filter(item => item.value > 0)
 
   // Group audit trails by operation type to identify issues
-  const flagsByType = auditTrails.reduce((acc, trail) => {
+  const flagsByType = (auditTrails || []).reduce((acc, trail) => {
     const key = trail.operation
     if (!acc[key]) {
       acc[key] = { issue: key.replace(/_/g, ' '), count: 0, priority: 'medium', flags: [] }
@@ -152,15 +152,15 @@ export default function AdminDashboard() {
   }, {} as Record<string, any>)
 
   const aiFlags = Object.values(flagsByType).map((item: any) => ({
-    id: item.flags[0].id,
+    id: item.flags[0]?.id || 'unknown',
     issue: item.issue.charAt(0).toUpperCase() + item.issue.slice(1),
     count: item.count,
     priority: item.priority,
-    region: item.flags[0].objectStore
+    region: item.flags[0]?.objectStore || 'unknown'
   }))
 
   // Calculate enumerator performance from samples
-  const collectorPerformance = samples.reduce((acc, sample) => {
+  const collectorPerformance = (samples || []).reduce((acc, sample) => {
     const collectorId = sample.collectorId
     const collectorName = collectorId
     
@@ -170,12 +170,12 @@ export default function AdminDashboard() {
     acc[collectorId].samples++
     
     // Check if sample has lab result
-    if (labResults.some(l => l.sampleId === sample.id)) {
+    if ((labResults || []).some(l => l.sampleId === sample.id)) {
       acc[collectorId].labResults++
     }
     
     // Track quality checks based on quality flags
-    const qualityScore = sample.qualityFlags.length === 0 ? 1 : 0.7
+    const qualityScore = (sample.qualityFlags || []).length === 0 ? 1 : 0.7
     acc[collectorId].qualityChecks.push(qualityScore)
     
     return acc
@@ -201,11 +201,8 @@ export default function AdminDashboard() {
   }
   return (
     <div className="space-y-6">
-      {/* Header with Breadcrumb and Refresh */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          <span>Dashboard</span> / <span>Overview</span>
-        </div>
+      {/* Refresh Button - Top Right */}
+      <div className="flex items-center justify-end">
         <div className="flex items-center gap-3">
           {lastRefresh && (
             <span className="text-xs text-muted-foreground">
@@ -229,39 +226,39 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
           <div className="text-sm text-blue-700 dark:text-blue-300 font-medium">Total Households</div>
-          <div className="text-3xl font-bold mt-2 text-blue-900 dark:text-blue-100">{households.length.toLocaleString()}</div>
+          <div className="text-3xl font-bold mt-2 text-blue-900 dark:text-blue-100">{(households || []).length.toLocaleString()}</div>
           <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 flex items-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-            {households.filter(h => h.syncStatus === 'synced').length} synced
+            {(households || []).filter(h => h.syncStatus === 'synced').length} synced
           </div>
         </Card>
         <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
           <div className="text-sm text-green-700 dark:text-green-300 font-medium">Total Participants</div>
-          <div className="text-3xl font-bold mt-2 text-green-900 dark:text-green-100">{participants.length.toLocaleString()}</div>
+          <div className="text-3xl font-bold mt-2 text-green-900 dark:text-green-100">{(participants || []).length.toLocaleString()}</div>
           <div className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-            {participants.filter(p => p.syncStatus === 'synced').length} synced
+            {(participants || []).filter(p => p.syncStatus === 'synced').length} synced
           </div>
         </Card>
         <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800">
           <div className="text-sm text-amber-700 dark:text-amber-300 font-medium">Samples Collected</div>
-          <div className="text-3xl font-bold mt-2 text-amber-900 dark:text-amber-100">{samples.length.toLocaleString()}</div>
+          <div className="text-3xl font-bold mt-2 text-amber-900 dark:text-amber-100">{(samples || []).length.toLocaleString()}</div>
           <div className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
             <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-            {samples.filter(s => s.syncStatus === 'synced').length} synced
+            {(samples || []).filter(s => s.syncStatus === 'synced').length} synced
           </div>
         </Card>
         <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
           <div className="text-sm text-purple-700 dark:text-purple-300 font-medium">Lab Results</div>
-          <div className="text-3xl font-bold mt-2 text-purple-900 dark:text-purple-100">{labResults.length.toLocaleString()}</div>
+          <div className="text-3xl font-bold mt-2 text-purple-900 dark:text-purple-100">{(labResults || []).length.toLocaleString()}</div>
           <div className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-            {samples.length > 0 ? Math.round((labResults.length / samples.length) * 100) : 0}% completion rate
+            {(samples || []).length > 0 ? Math.round(((labResults || []).length / (samples || []).length) * 100) : 0}% completion rate
           </div>
         </Card>
         <Card className="p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 border-indigo-200 dark:border-indigo-800">
           <div className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">Active Projects</div>
-          <div className="text-3xl font-bold mt-2 text-indigo-900 dark:text-indigo-100">{projects.filter(p => p.status === 'in_progress').length}</div>
-          <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">{projects.length} total projects</div>
+          <div className="text-3xl font-bold mt-2 text-indigo-900 dark:text-indigo-100">{(projects || []).length}</div>
+          <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">{(projects || []).length} total projects</div>
         </Card>
       </div>
 
@@ -405,46 +402,52 @@ export default function AdminDashboard() {
       <Card className="p-6">
         <h3 className="font-semibold mb-4">Project Timeline & Status</h3>
         <div className="space-y-4">
-          {projects.length > 0 ? (
-            projects.map((project) => (
-              <div key={project.id} className="border border-border rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <h4 className="font-medium text-sm">{project.name}</h4>
-                      <p className="text-xs text-muted-foreground">
-                        {project.id} • {project.regions.join(', ')}
-                      </p>
+          {(projects || []).length > 0 ? (
+            (projects || []).map((project) => {
+              const startDate = project.studyPeriod?.start || 'N/A'
+              const endDate = project.studyPeriod?.end || 'N/A'
+              const isActive = new Date() >= new Date(startDate) && new Date() <= new Date(endDate)
+              
+              return (
+                <div key={project.id} className="border border-border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div>
+                        <h4 className="font-medium text-sm">{project.projectName}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          {project.projectCode} • {(project.regions || []).join(', ') || 'No regions'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          isActive
+                            ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                            : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-100"
+                        }`}
+                      >
+                        {isActive ? 'Active' : 'Inactive'}
+                      </span>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        project.status === "in_progress"
-                          ? "bg-green-100 text-green-800"
-                          : project.status === "not_started"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : project.status === "completed"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {project.status.replace(/_/g, ' ').charAt(0).toUpperCase() + project.status.replace(/_/g, ' ').slice(1)}
-                    </span>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Target: {project.targetSampleSize || 0} samples</span>
+                      <span>{startDate} - {endDate}</span>
+                    </div>
+                    {project.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">{project.description}</p>
+                    )}
                   </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>Type: {project.type.replace(/_/g, ' ')}</span>
-                    <span>{project.startDate} - {project.endDate}</span>
-                  </div>
-                </div>
-              </div>
-            ))
+              )
+            })
           ) : (
-            <div className="flex items-center justify-center h-32 text-muted-foreground">
-              No projects available
+            <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
+              <p>No projects available</p>
+              <p className="text-xs mt-1">Create a project in Project Management</p>
             </div>
           )}
         </div>

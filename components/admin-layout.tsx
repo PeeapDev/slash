@@ -32,6 +32,7 @@ import LabDashboard from "@/components/lab-dashboard"
 import LabResultsEntryForm from "@/components/lab-results-entry-form"
 import LabReviewAnalytics from "@/components/lab-review-analytics"
 import TeamManagement from "@/components/team-management"
+import Teams from "@/components/teams"
 
 interface AdminLayoutProps {
   user: any
@@ -76,8 +77,9 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
     { id: "projects", label: "Projects", icon: "📋", section: "Administration" },
     { id: "regions", label: "Regions", icon: "🗺️", section: "Administration" },
     { id: "districts", label: "Districts", icon: "📍", section: "Administration" },
-    { id: "team", label: "Team Management", icon: "👥", section: "Administration" },
-    { id: "hr", label: "HR Management", icon: "💼", section: "Administration" },
+    { id: "teams", label: "Teams", icon: "👥", section: "Administration" },
+    { id: "hr", label: "HR & Staff Directory", icon: "💼", section: "Administration" },
+    { id: "team", label: "Role Management", icon: "🔐", section: "Administration" },
     
     // System
     { id: "sync", label: "Sync & Offline", icon: "📡", section: "System" },
@@ -113,6 +115,8 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
         return <RegionalManagement />
       case "districts":
         return <DistrictManagement />
+      case "teams":
+        return <Teams />
       case "team":
         return <TeamManagement />
       case "hr":
