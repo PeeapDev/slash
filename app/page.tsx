@@ -1,14 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import PWALandingPage from "@/components/pwa-landing-page"
 import LoginPage from "@/components/login-page"
 import AdminLayout from "@/components/admin-layout"
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [showLanding, setShowLanding] = useState(true)
   const [currentPage, setCurrentPage] = useState("dashboard")
 
   useEffect(() => {
@@ -16,22 +14,10 @@ export default function Home() {
     const storedUser = localStorage.getItem("current_user")
     if (storedUser) {
       setUser(JSON.parse(storedUser))
-      setShowLanding(false)
-    }
-    
-    // Check if user has seen landing page
-    const hasSeenLanding = localStorage.getItem("has_seen_landing")
-    if (hasSeenLanding === "true") {
-      setShowLanding(false)
     }
     
     setIsLoading(false)
   }, [])
-
-  const handleContinueFromLanding = () => {
-    setShowLanding(false)
-    localStorage.setItem("has_seen_landing", "true")
-  }
 
   const handleLogin = () => {
     // Create a default user object for the session
@@ -54,11 +40,6 @@ export default function Home() {
         </div>
       </div>
     )
-  }
-
-  // Show landing page on first visit
-  if (showLanding && !user) {
-    return <PWALandingPage onContinue={handleContinueFromLanding} />
   }
 
   if (!user) {
