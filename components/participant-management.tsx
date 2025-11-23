@@ -51,7 +51,7 @@ export default function ParticipantManagement() {
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
       
-      const localParticipants = await offlineDB.getAll('participants')
+      const localParticipants = await offlineDB.getAll('participants') as Participant[]
       console.log(`✅ Loaded ${localParticipants.length} participants from IndexedDB`)
       setParticipants(localParticipants)
       
@@ -71,7 +71,7 @@ export default function ParticipantManagement() {
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
       
-      const localHouseholds = await offlineDB.getAll('households')
+      const localHouseholds = await offlineDB.getAll('households') as Household[]
       console.log(`✅ Loaded ${localHouseholds.length} households from IndexedDB`)
       setHouseholds(localHouseholds)
       
@@ -350,15 +350,15 @@ function ParticipantFormModal({ participant, households, onSave, onClose }: Part
       if (formData.householdId) {
         try {
           const household = households.find(h => h.id === formData.householdId)
-          setSelectedHousehold(household)
+          setSelectedHousehold(household || null)
           
           if (household) {
             const { offlineDB } = await import('@/lib/offline-first-db')
             await offlineDB.init()
             
             // Get all participants for this household
-            const allParticipants = await offlineDB.getAll('participants')
-            const householdParticipants = allParticipants.filter(p => p.householdId === formData.householdId)
+            const allParticipants = await offlineDB.getAll('participants') as Participant[]
+            const householdParticipants = allParticipants.filter((p: Participant) => p.householdId === formData.householdId)
             
             setParticipantCount({
               expected: household.familySize || 0,
