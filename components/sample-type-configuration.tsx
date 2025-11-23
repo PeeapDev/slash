@@ -55,7 +55,7 @@ export default function SampleTypeConfiguration() {
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
       
-      const localTypes = await offlineDB.getAll<SampleType>('sample_types')
+      const localTypes = await offlineDB.getAll('sample_types') as SampleType[]
       console.log(`✅ Loaded ${localTypes.length} sample types from IndexedDB`)
       
       if (localTypes.length === 0) {
@@ -87,7 +87,9 @@ export default function SampleTypeConfiguration() {
         ],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        syncStatus: 'local',
+        deviceId: 'system',
+        collectorId: 'system',
+        syncStatus: 'pending' as const,
         version: 1
       },
       {
@@ -104,7 +106,9 @@ export default function SampleTypeConfiguration() {
         ],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        syncStatus: 'local',
+        deviceId: 'system',
+        collectorId: 'system',
+        syncStatus: 'pending' as const,
         version: 1
       }
     ]
@@ -112,7 +116,7 @@ export default function SampleTypeConfiguration() {
     try {
       const { offlineDB } = await import('@/lib/offline-first-db')
       for (const type of defaultTypes) {
-        await offlineDB.create<SampleType>('sample_types', type)
+        await offlineDB.create('sample_types', type)
       }
       setSampleTypes(defaultTypes)
       console.log('✅ Created default sample types')
@@ -149,11 +153,13 @@ export default function SampleTypeConfiguration() {
           isActive: typeData.isActive !== false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-          syncStatus: 'local',
+          deviceId: 'user_created',
+          collectorId: 'admin',
+          syncStatus: 'pending' as const,
           version: 1
         }
         
-        await offlineDB.create<SampleType>('sample_types', newType)
+        await offlineDB.create('sample_types', newType)
         setSampleTypes(prev => [...prev, newType])
         console.log(`✅ Created sample type: ${newType.id}`)
       }

@@ -291,6 +291,7 @@ export interface OfflineDBSchema {
   participants: Participant[]
   surveys: Survey[]
   samples: Sample[]
+  sample_types: SampleType[]
   forms: Form[]
   form_responses: FormResponse[]
   project_metadata: ProjectMetadata[]
@@ -302,7 +303,7 @@ export interface OfflineDBSchema {
 // Offline-First Database Service
 class OfflineFirstDB {
   private dbName = 'SLASH_FIELDWORK_DB'
-  private dbVersion = 3 // Increased for sample_types store
+  private dbVersion = 4 // Increased for sample_types store
   private db: IDBDatabase | null = null
   private deviceId: string
   private collectorId: string

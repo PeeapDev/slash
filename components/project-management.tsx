@@ -84,12 +84,13 @@ export default function ProjectManagement() {
       await offlineDB.init()
       
       // Try to get user from settings store
-      const userSettings = await offlineDB.getAll('settings')
-      const currentUserSetting = userSettings.find((s: any) => s.key === 'current_user')
+      const userSettings = await offlineDB.getAll('settings') as any[]
+      const currentUserSetting = userSettings.find((s: any) => s.key === 'current_user') as any
       
-      if (currentUserSetting && currentUserSetting.value) {
-        setUserRole((currentUserSetting.value as any).role || 'superadmin')
-        console.log(`✅ Loaded user role: ${(currentUserSetting.value as any).role}`)
+      if (currentUserSetting && currentUserSetting.value && currentUserSetting.value.role) {
+        const userRole = currentUserSetting.value.role as string
+        setUserRole(userRole || 'superadmin')
+        console.log(`✅ Loaded user role: ${userRole}`)
       } else {
         // Default to superadmin if no user found
         setUserRole('superadmin')
