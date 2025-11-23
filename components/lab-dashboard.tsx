@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -7,16 +8,57 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, CheckCircle2 } from "lucide-react"
 
 export default function LabDashboard() {
-  const pendingSamples = [
-    { id: "S001", participantId: "PT001", type: "Urine", submittedDate: "2024-01-15", status: "pending" },
-    { id: "S002", participantId: "PT002", type: "Blood", submittedDate: "2024-01-15", status: "pending" },
-    { id: "S003", participantId: "PT003", type: "Urine", submittedDate: "2024-01-14", status: "pending" },
-  ]
+  const [pendingSamples, setPendingSamples] = useState<any[]>([])
+  const [completedResults, setCompletedResults] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const completedResults = [
-    { id: "S101", participantId: "PT010", type: "Blood", completedDate: "2024-01-14", status: "completed" },
-    { id: "S102", participantId: "PT011", type: "Urine", completedDate: "2024-01-13", status: "completed" },
-  ]
+  useEffect(() => {
+    loadSamples()
+  }, [])
+
+  const loadSamples = async () => {
+    try {
+      console.log('🧪 Loading samples from IndexedDB for Lab Queue...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const allSamples = await offlineDB.getAll('samples')
+      console.log(`✅ Loaded ${allSamples.length} samples from IndexedDB`)
+      
+      // Filter pending samples (collected but not analyzed)
+      const pending = allSamples.filter((s: any) => 
+        s.status === 'collected' || s.status === 'pending' || s.status === 'in_transit'
+      ).map((s: any) => ({
+        id: s.sampleCode || s.sampleId,
+        participantId: s.participantId,
+        type: s.sampleType,
+        submittedDate: new Date(s.collectionTimestamp || s.createdAt).toLocaleDateString(),
+        status: s.status
+      }))
+      
+      // Filter completed samples
+      const completed = allSamples.filter((s: any) => 
+        s.status === 'analyzed' || s.status === 'completed' || s.status === 'lab_completed'
+      ).map((s: any) => ({
+        id: s.sampleCode || s.sampleId,
+        participantId: s.participantId,
+        type: s.sampleType,
+        completedDate: new Date(s.updatedAt).toLocaleDateString(),
+        status: s.status
+      }))
+      
+      setPendingSamples(pending)
+      setCompletedResults(completed)
+      
+      console.log(`📊 Lab Queue: ${pending.length} pending, ${completed.length} completed`)
+    } catch (error) {
+      console.error('❌ Error loading samples:', error)
+      setPendingSamples([])
+      setCompletedResults([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -80,16 +122,24 @@ export default function LabDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {pendingSamples.map((sample) => (
-                  <tr key={sample.id} className="border-b hover:bg-slate-50">
-                    <td className="py-2 px-2 font-mono">{sample.id}</td>
-                    <td className="py-2 px-2">{sample.participantId}</td>
-                    <td className="py-2 px-2">
-                      <Badge variant="outline">{sample.type}</Badge>
+                {pendingSamples.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                      No pending samples. Collect samples to see them here.
                     </td>
-                    <td className="py-2 px-2 text-muted-foreground">{sample.submittedDate}</td>
                   </tr>
-                ))}
+                ) : (
+                  pendingSamples.map((sample) => (
+                    <tr key={sample.id} className="border-b hover:bg-slate-50">
+                      <td className="py-2 px-2 font-mono">{sample.id}</td>
+                      <td className="py-2 px-2">{sample.participantId}</td>
+                      <td className="py-2 px-2">
+                        <Badge variant="outline">{sample.type}</Badge>
+                      </td>
+                      <td className="py-2 px-2 text-muted-foreground">{sample.submittedDate}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -116,16 +166,24 @@ export default function LabDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {completedResults.map((result) => (
-                  <tr key={result.id} className="border-b hover:bg-slate-50">
-                    <td className="py-2 px-2 font-mono">{result.id}</td>
-                    <td className="py-2 px-2">{result.participantId}</td>
-                    <td className="py-2 px-2">
-                      <Badge className="bg-green-100 text-green-800">{result.type}</Badge>
+                {completedResults.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                      No completed results yet.
                     </td>
-                    <td className="py-2 px-2 text-muted-foreground">{result.completedDate}</td>
                   </tr>
-                ))}
+                ) : (
+                  completedResults.map((result) => (
+                    <tr key={result.id} className="border-b hover:bg-slate-50">
+                      <td className="py-2 px-2 font-mono">{result.id}</td>
+                      <td className="py-2 px-2">{result.participantId}</td>
+                      <td className="py-2 px-2">
+                        <Badge className="bg-green-100 text-green-800">{result.type}</Badge>
+                      </td>
+                      <td className="py-2 px-2 text-muted-foreground">{result.completedDate}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
