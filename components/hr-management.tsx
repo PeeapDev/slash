@@ -4,12 +4,14 @@ import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Trash2, Eye, Lock } from "lucide-react"
+import { Plus, Trash2, Eye, Lock, CheckCircle } from "lucide-react"
 import { generateId } from "@/lib/utils"
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
 import { ROLE_DEFINITIONS, TeamRole } from "@/lib/team-roles"
+import { useToast } from "@/components/ui/use-toast"
 
 export default function HRManagement() {
+  const { toast } = useToast()
   const [staff, setStaff] = useState([])
   const [roles, setRoles] = useState([])
   const [regions, setRegions] = useState([])
@@ -91,7 +93,12 @@ export default function HRManagement() {
   const handleAddStaff = async () => {
     if (formData.name && formData.email && formData.role) {
       if (formData.role === "supervisor" && !formData.region) {
-        alert("Supervisors must be assigned to a region")
+        toast({
+          title: "Region Required",
+          description: "Supervisors must be assigned to a region",
+          variant: "destructive",
+          duration: 3000,
+        })
         return
       }
 
@@ -100,9 +107,8 @@ export default function HRManagement() {
         const { offlineDB } = await import('@/lib/offline-first-db')
         await offlineDB.init()
 
-        // Generate default password: 123456 + phone or email
-        const passwordSuffix = formData.phone || formData.email.split('@')[0]
-        const defaultPassword = `123456${passwordSuffix}`
+        // Default password is always "123456"
+        const defaultPassword = "123456"
 
         const newStaffMember = {
           id: `TEAM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -130,8 +136,15 @@ export default function HRManagement() {
         }
 
         await offlineDB.create('team_members', newStaffMember)
-        console.log(`✅ Staff member created with default password: ${defaultPassword}`)
-        alert(`Staff created! Default password: ${defaultPassword}\nStaff can login and change password.`)
+        console.log(`✅ Staff member created: ${formData.name}`)
+        
+        // Show success toast
+        toast({
+          title: "Staff Created Successfully!",
+          description: `${formData.name} can now login with email or phone number using password: 123456`,
+          variant: "default",
+          duration: 5000,
+        })
         
         await loadStaff() // Refresh from IndexedDB
         setFormData({
@@ -145,10 +158,20 @@ export default function HRManagement() {
         setShowForm(false)
       } catch (error) {
         console.error('❌ Error creating staff member:', error)
-        alert('Error creating staff member. Check console for details.')
+        toast({
+          title: "Error Creating Staff",
+          description: "Failed to create staff member. Please try again.",
+          variant: "destructive",
+          duration: 4000,
+        })
       }
     } else {
-      alert('Please fill in all required fields (Name, Email, Role)')
+      toast({
+        title: "Missing Required Fields",
+        description: "Please fill in Name, Email, and Role.",
+        variant: "destructive",
+        duration: 3000,
+      })
     }
   }
 
@@ -286,10 +309,13 @@ export default function HRManagement() {
         >
           <Card className="p-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
           <h2 className="font-semibold mb-4 text-foreground">Add New Staff Member</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            <Lock className="inline w-4 h-4 mr-1" />
-            Default password will be: <span className="font-mono font-bold">123456 + phone/email</span>
-          </p>
+          <div className="flex items-center gap-2 p-3 bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg mb-4">
+            <Lock className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              Default password: <span className="font-mono font-bold">123456</span>
+              <span className="text-xs block mt-1">Staff can login with email or phone number</span>
+            </p>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               type="text"
@@ -309,7 +335,7 @@ export default function HRManagement() {
             />
             <input
               type="tel"
-              placeholder="Phone Number (for password)"
+              placeholder="Phone Number (for login)"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               className="px-3 py-2 border rounded-lg bg-background text-foreground dark:bg-slate-800 dark:border-slate-600"
