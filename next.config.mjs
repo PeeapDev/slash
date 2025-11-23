@@ -7,10 +7,13 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  // PWA Configuration
+  // PWA Configuration - Turbopack compatible
   experimental: {
     webpackBuildWorker: true,
   },
+  
+  // Empty turbopack config to silence warnings
+  turbopack: {},
   
   // Headers for PWA security and functionality
   async headers() {
@@ -55,21 +58,6 @@ const nextConfig = {
         ],
       },
     ]
-  },
-
-  // Webpack configuration for PWA assets
-  webpack: (config, { dev, isServer }) => {
-    // Add service worker to the output
-    if (!dev && !isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-        net: false,
-        tls: false,
-      }
-    }
-    
-    return config
   },
 
   // Enable static file serving for PWA assets
