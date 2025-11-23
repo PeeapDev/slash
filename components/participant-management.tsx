@@ -64,7 +64,44 @@ export default function ParticipantManagement() {
       
       const localParticipants = await offlineDB.getAll('participants') as Participant[]
       console.log(`✅ Loaded ${localParticipants.length} participants from IndexedDB`)
-      setParticipants(localParticipants)
+      console.log('📋 Sample participant data:', localParticipants[0])
+      
+      // Fix any participants missing critical fields (data migration)
+      let migrationNeeded = false
+      const fixedParticipants = localParticipants.map((p: any) => {
+        let fixed = { ...p }
+        let needsUpdate = false
+        
+        // Fix missing participantId
+        if (!fixed.participantId && fixed.id) {
+          fixed.participantId = `PID-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`
+          needsUpdate = true
+          console.log(`🔧 Fixed missing participantId for ${fixed.fullName}`)
+        }
+        
+        // Fix missing gender (default to male if not set)
+        if (!fixed.gender) {
+          fixed.gender = 'male'
+          needsUpdate = true
+          console.log(`🔧 Fixed missing gender for ${fixed.fullName}`)
+        }
+        
+        if (needsUpdate) {
+          migrationNeeded = true
+          // Update in IndexedDB
+          offlineDB.update('participants', fixed.id, fixed).catch(err => 
+            console.error('Error updating participant:', err)
+          )
+        }
+        
+        return fixed
+      })
+      
+      if (migrationNeeded) {
+        console.log('✅ Data migration completed - fixed missing fields')
+      }
+      
+      setParticipants(fixedParticipants)
       
       if (localParticipants.length === 0) {
         console.log('ℹ️ No participants found in IndexedDB - create participants to see them here')

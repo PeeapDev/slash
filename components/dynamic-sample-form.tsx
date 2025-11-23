@@ -94,6 +94,7 @@ export default function DynamicSampleForm({
       
       const localTypes = await offlineDB.getAll('sample_types')
       console.log(`✅ Loaded ${localTypes.length} sample types from IndexedDB`)
+      console.log('📋 Sample types raw data:', localTypes)
 
       if (localTypes.length === 0) {
         console.log('⚠️ No sample types found in IndexedDB - using fallback types')
@@ -124,21 +125,39 @@ export default function DynamicSampleForm({
         return
       }
 
-      // Format for form compatibility and ensure unique IDs
-      const formattedTypes = localTypes.map((type: any) => ({
-        id: `db_${type.id}`, // Prefix to ensure uniqueness
-        type_code: type.code,
-        display_name: type.name,
-        description: type.description,
-        form_schema: {
-          fields: type.fields || []
+      // Filter only active sample types and format for form compatibility
+      const activeTypes = localTypes.filter((type: any) => type.isActive !== false)
+      console.log(`🎯 Filtered to ${activeTypes.length} active sample types`)
+      
+      const formattedTypes = activeTypes.map((type: any) => {
+        console.log('🔄 Formatting type:', type)
+        return {
+          id: `db_${type.id}`, // Prefix to ensure uniqueness
+          type_code: type.code,
+          display_name: type.name,
+          description: type.description,
+          isActive: type.isActive,
+          form_schema: {
+            fields: type.fields || []
+          }
         }
-      }))
+      })
+      
+      // Log before deduplication
+      console.log(`📦 Before deduplication: ${formattedTypes.length} types`)
+      formattedTypes.forEach((type, idx) => {
+        console.log(`  ${idx + 1}. ${type.display_name} (${type.type_code}) - ID: ${type.id}`)
+      })
       
       // Remove duplicates by type_code to prevent key conflicts
       const uniqueTypes = formattedTypes.filter((type, index, array) => 
         array.findIndex(t => t.type_code === type.type_code) === index
       )
+      
+      console.log(`✂️ After deduplication: ${uniqueTypes.length} unique types`)
+      uniqueTypes.forEach((type, idx) => {
+        console.log(`  ${idx + 1}. ${type.display_name} (${type.type_code})`)
+      })
       
       setSampleTypes(uniqueTypes)
     } catch (error) {
@@ -206,16 +225,17 @@ export default function DynamicSampleForm({
       const localParticipants = await offlineDB.getAll('participants')
       console.log(`✅ Loaded ${localParticipants.length} participants from IndexedDB`)
       
-      // Format for form compatibility
+      // Format for form compatibility using correct database fields
       const formattedParticipants = localParticipants.map((p: any) => ({
         id: p.id,
-        participant_code: p.participantCode || p.participant_code,
-        first_name: p.firstName || p.first_name,
-        last_name: p.lastName || p.last_name,
+        participant_id: p.participantId,  // Use participantId from database
+        full_name: p.fullName,            // Use fullName from database
         age: p.age,
         gender: p.gender,
-        phone: p.phone
+        household_id: p.householdId
       }))
+      
+      console.log('📋 Formatted participant sample:', formattedParticipants[0])
       
       setParticipants(formattedParticipants)
       
@@ -462,17 +482,28 @@ export default function DynamicSampleForm({
   }
 
   const getAvailableSampleTypes = () => {
-    if (!selectedProject) return []
+    if (!selectedProject) {
+      console.log('⚠️ No project selected')
+      return []
+    }
+    
+    console.log('🔍 Getting available sample types...')
+    console.log('📋 All loaded sample types:', sampleTypes)
+    console.log('🎯 Selected project:', selectedProject)
+    console.log('📝 Project expected types:', selectedProject.expected_sample_types)
     
     // If project has specific sample types configured, use those
     // Otherwise, show all active sample types from Settings
     if (selectedProject.expected_sample_types && selectedProject.expected_sample_types.length > 0) {
-      return sampleTypes.filter(st => 
+      const filtered = sampleTypes.filter(st => 
         selectedProject.expected_sample_types.includes(st.type_code)
       )
+      console.log('✅ Filtered sample types (project-specific):', filtered)
+      return filtered
     }
     
     // Show all sample types configured in Settings > Sample Types
+    console.log('✅ Showing all sample types from Settings:', sampleTypes)
     return sampleTypes
   }
 

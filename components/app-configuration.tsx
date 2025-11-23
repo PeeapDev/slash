@@ -11,7 +11,6 @@ import SystemLogs from "@/components/system-logs"
 import DatabaseSetup from "@/components/database-setup"
 import DualDatabaseDemo from "@/components/dual-database-demo"
 import PWAStatus from "@/components/pwa-status"
-import SampleTypeConfiguration from "@/components/sample-type-configuration"
 import SyncStatus from "@/components/sync-status"
 
 // Type definitions for roles
@@ -172,14 +171,6 @@ export default function AppConfiguration() {
           }`}
         >
           System Settings
-        </button>
-        <button
-          onClick={() => setActiveTab("sample-types")}
-          className={`px-4 py-2 border-b-2 transition-colors font-medium ${
-            activeTab === "sample-types" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
-          }`}
-        >
-          Sample Types
         </button>
         <button
           onClick={() => setActiveTab("ai")}
@@ -415,18 +406,6 @@ export default function AppConfiguration() {
         </div>
       )}
 
-      {/* Sample Types Tab */}
-      {activeTab === "sample-types" && (
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Sample Type Configuration</h2>
-            <p className="text-muted-foreground">
-              Configure sample types and their collection fields. Define what data needs to be collected for each sample type.
-            </p>
-            <SampleTypeConfiguration />
-          </div>
-        </div>
-      )}
 
       {/* Database Tab */}
       {activeTab === "database" && (

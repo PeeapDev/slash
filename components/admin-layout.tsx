@@ -27,6 +27,9 @@ import FormBuilder from "@/components/form-builder"
 import UnifiedDashboard from "@/components/unified-dashboard"
 import NetworkStatus from "@/components/network-status"
 import SyncStatus from "@/components/sync-status"
+import SampleTypeConfiguration from "@/components/sample-type-configuration"
+import LabDashboard from "@/components/lab-dashboard"
+import LabResultsEntryForm from "@/components/lab-results-entry-form"
 
 interface AdminLayoutProps {
   user: any
@@ -62,6 +65,9 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
     
     // Laboratory
     { id: "samples", label: "Sample Management", icon: "🧪", section: "Laboratory" },
+    { id: "sample-types", label: "Sample Types", icon: "🔬", section: "Laboratory" },
+    { id: "lab-queue", label: "Lab Queue", icon: "📋", section: "Laboratory" },
+    { id: "lab-results", label: "Lab Results", icon: "📊", section: "Laboratory" },
     
     // Administration
     { id: "projects", label: "Projects", icon: "📋", section: "Administration" },
@@ -91,6 +97,12 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
         return <SurveyManagement />
       case "samples":
         return <SampleManagementDashboard />
+      case "sample-types":
+        return <SampleTypeConfiguration />
+      case "lab-queue":
+        return <LabDashboard />
+      case "lab-results":
+        return <LabResultsEntryForm />
       case "regions":
         return <RegionalManagement />
       case "districts":
