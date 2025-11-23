@@ -15,34 +15,139 @@ export default function SurveyManagement() {
   const [filterStatus, setFilterStatus] = useState("all")
 
   useEffect(() => {
-    // TODO: Load surveys, households, and participants from IndexedDB
-    setSurveys([])
-    setHouseholds([])
-    setParticipants([])
+    loadSurveys()
+    loadHouseholds()
+    loadParticipants()
   }, [])
 
-  const handleAddSurvey = (formData) => {
-    const newSurvey = {
-      id: `SUR-${Date.now()}`,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // INDEXEDDB-FIRST: Load surveys from IndexedDB
+  const loadSurveys = async () => {
+    try {
+      console.log('📝 Loading surveys from IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localSurveys = await offlineDB.getAll('surveys')
+      console.log(`✅ Loaded ${localSurveys.length} surveys from IndexedDB`)
+      setSurveys(localSurveys)
+      
+      if (localSurveys.length === 0) {
+        console.log('ℹ️ No surveys found in IndexedDB - create surveys to see them here')
+      }
+    } catch (error) {
+      console.error('❌ Error loading surveys from IndexedDB:', error)
+      setSurveys([])
     }
-    addSurvey(newSurvey)
-    setSurveys(getSurveys())
-    setShowForm(false)
   }
 
-  const handleUpdateSurvey = (id, formData) => {
-    updateSurvey(id, formData)
-    setSurveys(getSurveys())
-    setEditingSurvey(null)
+  // INDEXEDDB-FIRST: Load households from IndexedDB
+  const loadHouseholds = async () => {
+    try {
+      console.log('🏠 Loading households for survey dropdown...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localHouseholds = await offlineDB.getAll('households')
+      console.log(`✅ Loaded ${localHouseholds.length} households from IndexedDB`)
+      setHouseholds(localHouseholds)
+    } catch (error) {
+      console.error('❌ Error loading households from IndexedDB:', error)
+      setHouseholds([])
+    }
   }
 
-  const handleDeleteSurvey = (id) => {
+  // INDEXEDDB-FIRST: Load participants from IndexedDB
+  const loadParticipants = async () => {
+    try {
+      console.log('👥 Loading participants for survey dropdown...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localParticipants = await offlineDB.getAll('participants')
+      console.log(`✅ Loaded ${localParticipants.length} participants from IndexedDB`)
+      setParticipants(localParticipants)
+    } catch (error) {
+      console.error('❌ Error loading participants from IndexedDB:', error)
+      setParticipants([])
+    }
+  }
+
+  // INDEXEDDB-FIRST: Add survey to IndexedDB + Sync Queue
+  const handleAddSurvey = async (formData) => {
+    try {
+      console.log('📝 Creating new survey in IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const newSurvey = {
+        id: `SUR_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        surveyId: formData.surveyId || `SUR-${Date.now()}`,
+        title: formData.title,
+        description: formData.description,
+        householdId: formData.householdId,
+        participantId: formData.participantId,
+        surveyType: formData.surveyType || 'household',
+        status: formData.status || 'draft',
+        questions: formData.questions || [],
+        responses: formData.responses || {},
+        startDate: formData.startDate || new Date().toISOString(),
+        completedDate: formData.completedDate,
+        collectorId: formData.collectorId || 'unknown',
+        projectId: formData.projectId || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending',
+        version: 1
+      }
+
+      await offlineDB.create('surveys', newSurvey)
+      console.log('✅ Survey created in IndexedDB + added to sync queue')
+      
+      await loadSurveys() // Refresh from IndexedDB
+      setShowForm(false)
+    } catch (error) {
+      console.error('❌ Error creating survey:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Update survey in IndexedDB + Sync Queue
+  const handleUpdateSurvey = async (id, formData) => {
+    try {
+      console.log(`📝 Updating survey ${id} in IndexedDB...`)
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const updatedData = {
+        ...formData,
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending'
+      }
+
+      await offlineDB.update('surveys', id, updatedData)
+      console.log('✅ Survey updated in IndexedDB + added to sync queue')
+      
+      await loadSurveys() // Refresh from IndexedDB
+      setEditingSurvey(null)
+    } catch (error) {
+      console.error('❌ Error updating survey:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Delete survey from IndexedDB + Sync Queue
+  const handleDeleteSurvey = async (id) => {
     if (confirm("Are you sure you want to delete this survey?")) {
-      deleteSurvey(id)
-      setSurveys(getSurveys())
+      try {
+        console.log(`📝 Deleting survey ${id} from IndexedDB...`)
+        const { offlineDB } = await import('@/lib/offline-first-db')
+        await offlineDB.init()
+
+        await offlineDB.delete('surveys', id)
+        console.log('✅ Survey deleted from IndexedDB + added to sync queue')
+        
+        await loadSurveys() // Refresh from IndexedDB
+      } catch (error) {
+        console.error('❌ Error deleting survey:', error)
+      }
     }
   }
 

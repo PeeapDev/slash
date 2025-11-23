@@ -24,56 +24,174 @@ export default function HRManagement() {
   })
 
   useEffect(() => {
-    // TODO: Load staff and roles from IndexedDB
-    setStaff([])
-    setRoles([])
+    loadStaff()
+    loadRoles()
     setRegions(SIERRA_LEONE_REGIONS)
   }, [])
 
-  const handleAddStaff = () => {
+  // INDEXEDDB-FIRST: Load staff from IndexedDB (Note: Using Settings store for now)
+  const loadStaff = async () => {
+    try {
+      console.log('👥 Loading staff from IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      // For now, using settings store to store staff (can be moved to dedicated store later)
+      const staffSettings = await offlineDB.getAll('settings')
+      const staffData = staffSettings.filter(s => s.key && s.key.startsWith('staff_'))
+      
+      const formattedStaff = staffData.map(s => ({
+        id: s.key.replace('staff_', ''),
+        ...s.value
+      }))
+      
+      console.log(`✅ Loaded ${formattedStaff.length} staff members from IndexedDB`)
+      setStaff(formattedStaff)
+      
+      if (formattedStaff.length === 0) {
+        console.log('ℹ️ No staff found in IndexedDB - create staff to see them here')
+      }
+    } catch (error) {
+      console.error('❌ Error loading staff from IndexedDB:', error)
+      setStaff([])
+    }
+  }
+
+  // INDEXEDDB-FIRST: Load roles from IndexedDB (using default roles for now)
+  const loadRoles = async () => {
+    try {
+      console.log('👥 Loading roles for HR dropdown...')
+      // Use default roles (same as in app-configuration)
+      const defaultRoles = [
+        { id: 'superadmin', name: 'Super Admin' },
+        { id: 'field_collector', name: 'Field Collector' },
+        { id: 'lab_technician', name: 'Lab Technician' },
+        { id: 'supervisor', name: 'Supervisor' },
+        { id: 'regional_head', name: 'Regional Head' },
+        { id: 'ai_data_manager', name: 'AI Data Manager' }
+      ]
+      
+      setRoles(defaultRoles)
+      console.log(`✅ Loaded ${defaultRoles.length} roles`)
+    } catch (error) {
+      console.error('❌ Error loading roles:', error)
+      setRoles([])
+    }
+  }
+
+  // INDEXEDDB-FIRST: Add staff to IndexedDB + Sync Queue
+  const handleAddStaff = async () => {
     if (formData.name && formData.email && formData.role) {
       if (formData.role === "supervisor" && !formData.region) {
         alert("Supervisors must be assigned to a region")
         return
       }
 
-      const newStaff = {
-        id: generateId("STF"),
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        role: formData.role,
-        region: formData.region || null,
-        district: null,
-        status: "active",
-        employmentType: formData.employmentType,
-        joinDate: new Date().toISOString().split("T")[0],
-        createdAt: new Date().toISOString(),
+      try {
+        console.log('👥 Creating new staff member in IndexedDB...')
+        const { offlineDB } = await import('@/lib/offline-first-db')
+        await offlineDB.init()
+
+        const newStaff = {
+          id: generateId("STF"),
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          role: formData.role,
+          region: formData.region || null,
+          district: null,
+          status: "active",
+          employmentType: formData.employmentType,
+          joinDate: new Date().toISOString().split("T")[0],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'pending',
+          version: 1
+        }
+
+        // Store in settings with staff_ prefix
+        const staffSetting = {
+          id: `staff_${newStaff.id}`,
+          key: `staff_${newStaff.id}`,
+          value: newStaff,
+          category: 'hr',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'pending',
+          version: 1
+        }
+
+        await offlineDB.create('settings', staffSetting)
+        console.log('✅ Staff member created in IndexedDB + added to sync queue')
+        
+        await loadStaff() // Refresh from IndexedDB
+        setFormData({
+          name: "",
+          email: "",
+          phone: "",
+          role: "",
+          region: "",
+          employmentType: "full-time",
+        })
+        setShowForm(false)
+      } catch (error) {
+        console.error('❌ Error creating staff member:', error)
       }
-      addStaff(newStaff)
-      setStaff(getStaff())
-      setFormData({
-        name: "",
-        email: "",
-        phone: "",
-        role: "",
-        region: "",
-        employmentType: "full-time",
-      })
-      setShowForm(false)
     }
   }
 
-  const handleDeleteStaff = (id) => {
-    deleteStaff(id)
-    setStaff(getStaff())
-    setSelectedStaff(null)
+  // INDEXEDDB-FIRST: Delete staff from IndexedDB + Sync Queue
+  const handleDeleteStaff = async (id) => {
+    try {
+      console.log(`👥 Deleting staff ${id} from IndexedDB...`)
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      await offlineDB.delete('settings', `staff_${id}`)
+      console.log('✅ Staff member deleted from IndexedDB + added to sync queue')
+      
+      await loadStaff() // Refresh from IndexedDB
+      setSelectedStaff(null)
+    } catch (error) {
+      console.error('❌ Error deleting staff member:', error)
+    }
   }
 
-  const handleUpdateStatus = (id, status) => {
-    updateStaff(id, { status })
-    setStaff(getStaff())
-    setSelectedStaff(getStaff().find((s) => s.id === id))
+  // INDEXEDDB-FIRST: Update staff status in IndexedDB + Sync Queue
+  const handleUpdateStatus = async (id, status) => {
+    try {
+      console.log(`👥 Updating staff ${id} status to ${status}...`)
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      // Get existing staff data
+      const existing = await offlineDB.getById('settings', `staff_${id}`)
+      if (existing) {
+        const updatedStaff = {
+          ...existing.value,
+          status: status,
+          updatedAt: new Date().toISOString()
+        }
+
+        const updatedSetting = {
+          ...existing,
+          value: updatedStaff,
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'pending'
+        }
+
+        await offlineDB.update('settings', `staff_${id}`, updatedSetting)
+        console.log('✅ Staff status updated in IndexedDB + added to sync queue')
+        
+        await loadStaff() // Refresh from IndexedDB
+        const updatedStaffList = await offlineDB.getAll('settings')
+        const staffData = updatedStaffList.filter(s => s.key && s.key.startsWith('staff_'))
+        const formattedStaff = staffData.map(s => ({ id: s.key.replace('staff_', ''), ...s.value }))
+        setSelectedStaff(formattedStaff.find((s) => s.id === id))
+      }
+    } catch (error) {
+      console.error('❌ Error updating staff status:', error)
+    }
   }
 
   const supervisors = staff.filter((s) => s.role === "supervisor")

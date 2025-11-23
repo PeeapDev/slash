@@ -14,36 +14,125 @@ export default function ParticipantManagement() {
   const [filterHousehold, setFilterHousehold] = useState("all")
 
   useEffect(() => {
-    // TODO: Load participants and households from IndexedDB
-    setParticipants([])
-    setHouseholds([])
+    loadParticipants()
+    loadHouseholds()
   }, [])
 
-  const handleAddParticipant = (formData) => {
-    const newParticipant = {
-      id: `PART-${Date.now()}`,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // INDEXEDDB-FIRST: Load participants from IndexedDB
+  const loadParticipants = async () => {
+    try {
+      console.log('👥 Loading participants from IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localParticipants = await offlineDB.getAll('participants')
+      console.log(`✅ Loaded ${localParticipants.length} participants from IndexedDB`)
+      setParticipants(localParticipants)
+      
+      if (localParticipants.length === 0) {
+        console.log('ℹ️ No participants found in IndexedDB - create participants to see them here')
+      }
+    } catch (error) {
+      console.error('❌ Error loading participants from IndexedDB:', error)
+      setParticipants([])
     }
-    // TODO: Save to IndexedDB
-    // addParticipant(newParticipant)
-    // setParticipants(getParticipants())
-    setShowForm(false)
   }
 
-  const handleUpdateParticipant = (id, formData) => {
-    // TODO: Update in IndexedDB
-    // updateParticipant(id, formData)
-    // setParticipants(getParticipants())
-    setEditingParticipant(null)
+  // INDEXEDDB-FIRST: Load households from IndexedDB  
+  const loadHouseholds = async () => {
+    try {
+      console.log('🏠 Loading households for participant dropdown...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localHouseholds = await offlineDB.getAll('households')
+      console.log(`✅ Loaded ${localHouseholds.length} households from IndexedDB`)
+      setHouseholds(localHouseholds)
+      
+      if (localHouseholds.length === 0) {
+        console.log('ℹ️ No households found - create households first to assign participants')
+      }
+    } catch (error) {
+      console.error('❌ Error loading households from IndexedDB:', error)
+      setHouseholds([])
+    }
   }
 
-  const handleDeleteParticipant = (id) => {
+  // INDEXEDDB-FIRST: Add participant to IndexedDB + Sync Queue
+  const handleAddParticipant = async (formData) => {
+    try {
+      console.log('👥 Creating new participant in IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const newParticipant = {
+        id: `PART_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        participantCode: formData.participantCode || `PART-${Date.now()}`,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        phone: formData.phone,
+        email: formData.email,
+        householdId: formData.householdId,
+        relationshipToHead: formData.relationshipToHead || 'member',
+        occupation: formData.occupation,
+        education: formData.education,
+        status: formData.status || 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending',
+        version: 1
+      }
+
+      await offlineDB.create('participants', newParticipant)
+      console.log('✅ Participant created in IndexedDB + added to sync queue')
+      
+      await loadParticipants() // Refresh from IndexedDB
+      setShowForm(false)
+    } catch (error) {
+      console.error('❌ Error creating participant:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Update participant in IndexedDB + Sync Queue
+  const handleUpdateParticipant = async (id, formData) => {
+    try {
+      console.log(`👥 Updating participant ${id} in IndexedDB...`)
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const updatedData = {
+        ...formData,
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending'
+      }
+
+      await offlineDB.update('participants', id, updatedData)
+      console.log('✅ Participant updated in IndexedDB + added to sync queue')
+      
+      await loadParticipants() // Refresh from IndexedDB
+      setEditingParticipant(null)
+    } catch (error) {
+      console.error('❌ Error updating participant:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Delete participant from IndexedDB + Sync Queue
+  const handleDeleteParticipant = async (id) => {
     if (confirm("Are you sure you want to delete this participant?")) {
-      // TODO: Delete from IndexedDB
-      // deleteParticipant(id)
-      // setParticipants(getParticipants())
+      try {
+        console.log(`👥 Deleting participant ${id} from IndexedDB...`)
+        const { offlineDB } = await import('@/lib/offline-first-db')
+        await offlineDB.init()
+
+        await offlineDB.delete('participants', id)
+        console.log('✅ Participant deleted from IndexedDB + added to sync queue')
+        
+        await loadParticipants() // Refresh from IndexedDB
+      } catch (error) {
+        console.error('❌ Error deleting participant:', error)
+      }
     }
   }
 

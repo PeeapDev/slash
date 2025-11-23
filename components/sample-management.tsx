@@ -16,37 +16,140 @@ export default function SampleManagement() {
   const [filterStatus, setFilterStatus] = useState("all")
 
   useEffect(() => {
-    // TODO: Load samples, households, and participants from IndexedDB
-    setSamples([])
-    setHouseholds([])
-    setParticipants([])
+    loadSamples()
+    loadHouseholds()
+    loadParticipants()
   }, [])
 
-  const handleAddSample = (formData) => {
-    const newSample = {
-      id: `SAM-${Date.now()}`,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // INDEXEDDB-FIRST: Load samples from IndexedDB
+  const loadSamples = async () => {
+    try {
+      console.log('🧪 Loading samples from IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localSamples = await offlineDB.getAll('samples')
+      console.log(`✅ Loaded ${localSamples.length} samples from IndexedDB`)
+      setSamples(localSamples)
+      
+      if (localSamples.length === 0) {
+        console.log('ℹ️ No samples found in IndexedDB - create samples to see them here')
+      }
+    } catch (error) {
+      console.error('❌ Error loading samples from IndexedDB:', error)
+      setSamples([])
     }
-    // TODO: Save to IndexedDB
-    // addSample(newSample)
-    // setSamples(getSamples())
-    setShowForm(false)
   }
 
-  const handleUpdateSample = (id, formData) => {
-    // TODO: Update in IndexedDB
-    // updateSample(id, formData)
-    // setSamples(getSamples())
-    setEditingSample(null)
+  // INDEXEDDB-FIRST: Load households from IndexedDB
+  const loadHouseholds = async () => {
+    try {
+      console.log('🏠 Loading households for sample dropdown...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localHouseholds = await offlineDB.getAll('households')
+      console.log(`✅ Loaded ${localHouseholds.length} households from IndexedDB`)
+      setHouseholds(localHouseholds)
+    } catch (error) {
+      console.error('❌ Error loading households from IndexedDB:', error)
+      setHouseholds([])
+    }
   }
 
-  const handleDeleteSample = (id) => {
+  // INDEXEDDB-FIRST: Load participants from IndexedDB
+  const loadParticipants = async () => {
+    try {
+      console.log('👥 Loading participants for sample dropdown...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localParticipants = await offlineDB.getAll('participants')
+      console.log(`✅ Loaded ${localParticipants.length} participants from IndexedDB`)
+      setParticipants(localParticipants)
+    } catch (error) {
+      console.error('❌ Error loading participants from IndexedDB:', error)
+      setParticipants([])
+    }
+  }
+
+  // INDEXEDDB-FIRST: Add sample to IndexedDB + Sync Queue (Note: Use dynamic-sample-form for actual sample creation)
+  const handleAddSample = async (formData) => {
+    try {
+      console.log('🧪 Creating new sample in IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const newSample = {
+        id: `SAM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        sampleId: formData.sampleId || `SAM-${Date.now()}`,
+        participantId: formData.participantId,
+        householdId: formData.householdId || '',
+        sampleType: formData.sampleType || 'BLOOD',
+        sampleCode: formData.sampleCode || `SAM-${Date.now()}`,
+        collectionTimestamp: formData.collectionTimestamp || new Date().toISOString(),
+        collectorId: formData.collectorId || 'unknown',
+        chainOfCustody: [],
+        storageCondition: formData.storageCondition || 'room_temperature',
+        volume: parseFloat(formData.volume) || 0,
+        containerType: formData.containerType || 'standard',
+        status: formData.status || 'collected',
+        customFields: formData.customFields || {},
+        projectId: formData.projectId || '',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending',
+        version: 1
+      }
+
+      await offlineDB.create('samples', newSample)
+      console.log('✅ Sample created in IndexedDB + added to sync queue')
+      
+      await loadSamples() // Refresh from IndexedDB
+      setShowForm(false)
+    } catch (error) {
+      console.error('❌ Error creating sample:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Update sample in IndexedDB + Sync Queue
+  const handleUpdateSample = async (id, formData) => {
+    try {
+      console.log(`🧪 Updating sample ${id} in IndexedDB...`)
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const updatedData = {
+        ...formData,
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending'
+      }
+
+      await offlineDB.update('samples', id, updatedData)
+      console.log('✅ Sample updated in IndexedDB + added to sync queue')
+      
+      await loadSamples() // Refresh from IndexedDB
+      setEditingSample(null)
+    } catch (error) {
+      console.error('❌ Error updating sample:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Delete sample from IndexedDB + Sync Queue
+  const handleDeleteSample = async (id) => {
     if (confirm("Are you sure you want to delete this sample?")) {
-      // TODO: Delete from IndexedDB
-      // deleteSample(id)
-      // setSamples(getSamples())
+      try {
+        console.log(`🧪 Deleting sample ${id} from IndexedDB...`)
+        const { offlineDB } = await import('@/lib/offline-first-db')
+        await offlineDB.init()
+
+        await offlineDB.delete('samples', id)
+        console.log('✅ Sample deleted from IndexedDB + added to sync queue')
+        
+        await loadSamples() // Refresh from IndexedDB
+      } catch (error) {
+        console.error('❌ Error deleting sample:', error)
+      }
     }
   }
 
