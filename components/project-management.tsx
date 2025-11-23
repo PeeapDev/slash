@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
-import { getProjects, addProject, updateProject, deleteProject } from "@/lib/admin-data-store"
+// import { getProjects, addProject, updateProject, deleteProject } from "@/lib/admin-data-store"
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
 
 export default function ProjectManagement() {
@@ -17,11 +17,28 @@ export default function ProjectManagement() {
   const [userRole, setUserRole] = useState("superadmin")
 
   useEffect(() => {
-    setProjects(getProjects())
+    loadProjects()
     setRegions(SIERRA_LEONE_REGIONS)
     const user = JSON.parse(localStorage.getItem("current_user") || '{"role":"superadmin"}')
     setUserRole(user.role)
   }, [])
+
+  // Load projects from database API
+  const loadProjects = async () => {
+    try {
+      const response = await fetch('/api/projects')
+      const data = await response.json()
+      if (data.success) {
+        setProjects(data.data)
+      } else {
+        console.error('Failed to load projects:', data.error)
+        setProjects([])
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error)
+      setProjects([])
+    }
+  }
 
   const projectTypes = [
     { value: "household_survey", label: "Household Survey" },
@@ -36,28 +53,58 @@ export default function ProjectManagement() {
     completed: { bg: "bg-green-100", text: "text-green-800", label: "Completed" },
   }
 
-  const handleAddProject = (formData) => {
-    const newProject = {
-      id: `PROJECT-${Date.now()}`,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  const handleAddProject = async (formData: any) => {
+    try {
+      const response = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectCode: formData.code || `PROJECT-${Date.now()}`,
+          projectName: formData.name,
+          description: formData.description,
+          regionIds: formData.regions || [],
+          districtIds: formData.districts || [],
+          expectedSampleTypes: formData.type === 'blood_sample' ? ['BLOOD'] : 
+                             formData.type === 'urine_sample' ? ['URINE'] : 
+                             ['URINE', 'BLOOD'],
+          targetSamplesCount: formData.targetSamples || 0,
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          createdBy: 'admin'
+        })
+      })
+      
+      if (response.ok) {
+        await loadProjects() // Refresh the list
+        setShowForm(false)
+      } else {
+        const error = await response.json()
+        console.error('Failed to create project:', error.error)
+      }
+    } catch (error) {
+      console.error('Error creating project:', error)
     }
-    addProject(newProject)
-    setProjects(getProjects())
-    setShowForm(false)
   }
 
-  const handleUpdateProject = (id, formData) => {
-    updateProject(id, formData)
-    setProjects(getProjects())
-    setEditingProject(null)
+  const handleEditProject = async (id: string, formData: any) => {
+    try {
+      // For now, we'll implement this later - the API doesn't have PUT endpoint yet
+      console.log('Edit project not implemented yet:', id, formData)
+      setShowForm(false)
+      setEditingProject(null)
+    } catch (error) {
+      console.error('Error updating project:', error)
+    }
   }
 
-  const handleDeleteProject = (id) => {
-    if (confirm("Are you sure you want to delete this project?")) {
-      deleteProject(id)
-      setProjects(getProjects())
+  const handleDeleteProject = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this project?")) {
+      try {
+        // For now, we'll implement this later - the API doesn't have DELETE endpoint yet
+        console.log('Delete project not implemented yet:', id)
+      } catch (error) {
+        console.error('Error deleting project:', error)
+      }
     }
   }
 
