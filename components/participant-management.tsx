@@ -3,8 +3,9 @@
 import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Plus, Edit2, Trash2 } from "lucide-react"
+import { Plus, Edit2, Trash2, UserPlus } from "lucide-react"
 import type { Participant, Household } from "@/lib/offline-first-db"
+import { motion } from "framer-motion"
 
 // Predefined relationship options for analytics and consistency
 const RELATIONSHIP_OPTIONS = [
@@ -93,12 +94,39 @@ export default function ParticipantManagement() {
     }
   }
 
+  // Check for duplicate participants in same household
+  const checkDuplicateParticipant = async (householdId: string, fullName: string, age: number): Promise<boolean> => {
+    try {
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const allParticipants = await offlineDB.getAll('participants') as Participant[]
+      const duplicates = allParticipants.filter((p: Participant) => 
+        p.householdId === householdId && 
+        p.fullName.toLowerCase() === fullName.toLowerCase() && 
+        p.age === age
+      )
+      
+      return duplicates.length > 0
+    } catch (error) {
+      console.error('Error checking duplicates:', error)
+      return false
+    }
+  }
+
   // INDEXEDDB-FIRST: Add participant to IndexedDB + Sync Queue
   const handleAddParticipant = async (formData: ParticipantFormData) => {
     try {
       console.log('👥 Creating new participant in IndexedDB...')
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
+
+      // Check for duplicates
+      const isDuplicate = await checkDuplicateParticipant(formData.householdId, formData.fullName, formData.age)
+      if (isDuplicate) {
+        alert('⚠️ A participant with the same name and age already exists in this household. Please verify the information.')
+        return
+      }
 
       const newParticipant: Participant = {
         id: `PART_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -196,6 +224,39 @@ export default function ParticipantManagement() {
     // Handle both database schema (headOfHousehold) and component interface (headName)
     return household.headOfHousehold || household.headName || householdId
   }
+  
+  // Helper to check if household is complete
+  const isHouseholdComplete = (householdId: string) => {
+    const household = households.find(h => h.id === householdId) as any
+    if (!household) return false
+    
+    const expected = household.familySize || household.totalMembers || 0
+    const registered = participants.filter(p => p.householdId === householdId).length
+    
+    return expected > 0 && registered >= expected
+  }
+  
+  // Helper to get participant count for household
+  const getHouseholdParticipantCount = (householdId: string) => {
+    const household = households.find(h => h.id === householdId) as any
+    const expected = household?.familySize || household?.totalMembers || 0
+    const registered = participants.filter(p => p.householdId === householdId).length
+    return { expected, registered }
+  }
+  
+  // Quick add participant to household
+  const handleQuickAdd = (householdId: string) => {
+    setEditingParticipant(null)
+    setShowForm(true)
+    // Pre-fill household in form
+    setTimeout(() => {
+      const formElement = document.querySelector('select[name="householdId"]') as HTMLSelectElement
+      if (formElement) {
+        formElement.value = householdId
+        formElement.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+    }, 100)
+  }
 
   return (
     <div className="space-y-6">
@@ -248,9 +309,38 @@ export default function ParticipantManagement() {
             </thead>
             <tbody>
               {filteredParticipants.length > 0 ? (
-                filteredParticipants.map((participant: Participant) => (
-                  <tr key={participant.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="py-4 px-6 font-mono text-xs font-medium">{participant.participantId}</td>
+                filteredParticipants.map((participant: Participant) => {
+                  const householdComplete = isHouseholdComplete(participant.householdId)
+                  const count = getHouseholdParticipantCount(participant.householdId)
+                  
+                  return (
+                  <motion.tr 
+                    key={participant.id} 
+                    className="border-b border-border hover:bg-muted/50"
+                    initial={{ opacity: 0 }}
+                    animate={{ 
+                      opacity: 1,
+                      backgroundColor: householdComplete ? 'transparent' : 'rgba(251, 146, 60, 0.05)'
+                    }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-2">
+                        <motion.div
+                          className={`w-3 h-3 rounded-full ${
+                            householdComplete ? 'bg-green-500' : 'bg-orange-500'
+                          }`}
+                          animate={{
+                            scale: householdComplete ? 1 : [1, 1.2, 1],
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: householdComplete ? 0 : Infinity,
+                          }}
+                        />
+                        <span className="font-mono text-xs font-medium">{participant.participantId}</span>
+                      </div>
+                    </td>
                     <td className="py-4 px-6 font-medium">{participant.fullName}</td>
                     <td className="py-4 px-6">{participant.age}</td>
                     <td className="py-4 px-6 capitalize">{participant.gender}</td>
@@ -264,9 +354,27 @@ export default function ParticipantManagement() {
                         {participant.consentGiven ? "Yes" : "No"}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-xs">{getHouseholdName(participant.householdId)}</td>
+                    <td className="py-4 px-6">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs font-medium">{getHouseholdName(participant.householdId)}</span>
+                        <span className={`text-xs ${
+                          householdComplete ? 'text-green-600' : 'text-orange-600'
+                        }`}>
+                          {count.registered}/{count.expected} participants
+                        </span>
+                      </div>
+                    </td>
                     <td className="py-4 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
+                        {!householdComplete && (
+                          <button
+                            onClick={() => handleQuickAdd(participant.householdId)}
+                            className="p-1 hover:bg-green-100 rounded text-green-600"
+                            title="Quick add participant to this household"
+                          >
+                            <UserPlus size={16} />
+                          </button>
+                        )}
                         <button
                           onClick={() => setEditingParticipant(participant)}
                           className="p-1 hover:bg-muted rounded"
@@ -283,8 +391,9 @@ export default function ParticipantManagement() {
                         </button>
                       </div>
                     </td>
-                  </tr>
-                ))
+                  </motion.tr>
+                  )
+                })
               ) : (
                 <tr>
                   <td colSpan={8} className="py-8 px-6 text-center text-muted-foreground">
@@ -331,29 +440,17 @@ function ParticipantFormModal({ participant, households, onSave, onClose }: Part
   const [selectedHousehold, setSelectedHousehold] = useState<Household | null>(null)
   const [participantCount, setParticipantCount] = useState({ expected: 0, registered: 0 })
   
-  const [formData, setFormData] = useState<ParticipantFormData>(
-    participant ? {
-      householdId: participant.householdId,
-      fullName: participant.fullName,
-      age: participant.age,
-      gender: participant.gender,
-      relationToHead: participant.relationToHead,
-      consentGiven: participant.consentGiven,
-      projectId: participant.projectId,
-      occupation: participant.occupation,
-      education: participant.education,
-    } : {
-      householdId: "",
-      fullName: "",
-      age: 0,
-      gender: "male" as const,
-      relationToHead: "",
-      consentGiven: true,
-      projectId: "",
-      occupation: "",
-      education: "",
-    },
-  )
+  const [formData, setFormData] = useState<ParticipantFormData>({
+    householdId: participant?.householdId || "",
+    fullName: participant?.fullName || "",
+    age: participant?.age || 0,
+    gender: participant?.gender || "male",
+    relationToHead: participant?.relationToHead || "",
+    consentGiven: participant?.consentGiven ?? true,
+    projectId: participant?.projectId || "",
+    occupation: participant?.occupation || "",
+    education: participant?.education || "",
+  })
   
   // Load participant count when household is selected
   useEffect(() => {
@@ -398,7 +495,8 @@ function ParticipantFormModal({ participant, households, onSave, onClose }: Part
 
           <div>
             <label className="block text-sm font-medium mb-2">Household</label>
-            <select
+<select
+              name="householdId"
               required
               value={formData.householdId}
               onChange={(e) => setFormData({ ...formData, householdId: e.target.value })}
