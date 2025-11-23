@@ -100,8 +100,12 @@ export default function DynamicSampleForm({
     try {
       const response = await fetch('/api/projects')
       const data = await response.json()
+      console.log('Projects API response:', data)
       if (data.success) {
         setProjects(data.data)
+        console.log('Loaded projects:', data.data)
+      } else {
+        console.error('Projects API error:', data.error)
       }
     } catch (error) {
       console.error('Error loading projects:', error)
@@ -360,11 +364,17 @@ export default function DynamicSampleForm({
               <SelectValue placeholder="Select project" />
             </SelectTrigger>
             <SelectContent>
-              {projects.map((project) => (
-                <SelectItem key={project.id} value={project.id}>
-                  {project.project_name} ({project.project_code})
+              {projects.length === 0 ? (
+                <SelectItem value="" disabled>
+                  No projects available - Create a project first
                 </SelectItem>
-              ))}
+              ) : (
+                projects.map((project) => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.project_name} ({project.project_code})
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
           {errors.project && <p className="text-red-500 text-sm">{errors.project}</p>}
