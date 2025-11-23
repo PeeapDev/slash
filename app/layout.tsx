@@ -9,11 +9,29 @@ const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
-  title: "SLASH Data Capture Tool",
-  description: "Household and Lab Data Capture System",
-  generator: "v0.app",
+  title: "SLASH - Health Data Collection Platform",
+  description: "Offline-first health data collection and laboratory management system for field research",
+  manifest: "/manifest.json",
+  themeColor: "#3b82f6",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SLASH",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  openGraph: {
+    type: "website",
+    siteName: "SLASH",
+    title: "SLASH - Health Data Collection Platform", 
+    description: "Offline-first health data collection and laboratory management system",
+  },
   icons: {
     icon: [
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
       {
         url: "/icon-light-32x32.png",
         media: "(prefers-color-scheme: light)",

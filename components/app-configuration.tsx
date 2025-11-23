@@ -10,6 +10,7 @@ import AISettings from "@/components/ai-settings"
 import SystemLogs from "@/components/system-logs"
 import DatabaseSetup from "@/components/database-setup"
 import DualDatabaseDemo from "@/components/dual-database-demo"
+import PWAStatus from "@/components/pwa-status"
 
 // Type definitions for roles
 interface Role {
@@ -117,6 +118,14 @@ export default function AppConfiguration() {
           }`}
         >
           Database
+        </button>
+        <button
+          onClick={() => setActiveTab("pwa")}
+          className={`px-4 py-2 border-b-2 transition-colors font-medium ${
+            activeTab === "pwa" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
+          }`}
+        >
+          PWA Status
         </button>
       </div>
 
@@ -318,6 +327,19 @@ export default function AppConfiguration() {
             </p>
             <DatabaseSetup />
             <DualDatabaseDemo />
+          </div>
+        </div>
+      )}
+
+      {/* PWA Status Tab */}
+      {activeTab === "pwa" && (
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">PWA Status & Offline Capabilities</h2>
+            <p className="text-muted-foreground">
+              Monitor Progressive Web App status, offline data storage, and synchronization.
+            </p>
+            <PWAStatus />
           </div>
         </div>
       )}

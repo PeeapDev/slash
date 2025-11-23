@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLASH - You're Offline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            text-align: center;
+            max-width: 500px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px 30px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 30px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+        }
+        
+        h1 {
+            font-size: 28px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .description {
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            opacity: 0.8;
+        }
+        
+        .features {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+        
+        .features li {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .features li::before {
+            content: "✓ ";
+            color: #4ade80;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: white;
+            color: #667eea;
+        }
+        
+        .btn-primary:hover {
+            background: #f8fafc;
+            transform: translateY(-2px);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .status {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        
+        .status.online {
+            background: rgba(74, 222, 128, 0.2);
+            border: 1px solid rgba(74, 222, 128, 0.3);
+        }
+        
+        .status.offline {
+            background: rgba(248, 113, 113, 0.2);
+            border: 1px solid rgba(248, 113, 113, 0.3);
+        }
+        
+        @media (max-width: 600px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .subtitle {
+                font-size: 16px;
+            }
+            
+            .actions {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .btn {
+                width: 100%;
+                max-width: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📱</div>
+        
+        <h1>You're Offline</h1>
+        <p class="subtitle">SLASH Health Data Collection Platform</p>
+        
+        <p class="description">
+            No internet connection detected. Don't worry - SLASH is designed to work offline!
+        </p>
+        
+        <ul class="features">
+            <li>Continue collecting household and participant data</li>
+            <li>Record sample collections and lab results</li>
+            <li>Fill out forms and surveys offline</li>
+            <li>Data will sync automatically when connection returns</li>
+        </ul>
+        
+        <div class="actions">
+            <button class="btn btn-primary" onclick="goHome()">
+                🏠 Go to Dashboard
+            </button>
+            <button class="btn btn-secondary" onclick="checkConnection()">
+                🔄 Check Connection
+            </button>
+        </div>
+        
+        <div id="status" class="status offline">
+            <strong>Status:</strong> <span id="connection-status">Offline</span>
+            <br>
+            <small>Last checked: <span id="last-check">Never</span></small>
+        </div>
+    </div>
+
+    <script>
+        function goHome() {
+            window.location.href = '/';
+        }
+        
+        function checkConnection() {
+            const statusEl = document.getElementById('status');
+            const connectionEl = document.getElementById('connection-status');
+            const lastCheckEl = document.getElementById('last-check');
+            
+            // Update last check time
+            lastCheckEl.textContent = new Date().toLocaleTimeString();
+            
+            // Check if online
+            if (navigator.onLine) {
+                statusEl.className = 'status online';
+                connectionEl.textContent = 'Online';
+                
+                // Try to reload the page
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                statusEl.className = 'status offline';
+                connectionEl.textContent = 'Still offline';
+            }
+        }
+        
+        // Auto-check connection every 30 seconds
+        setInterval(checkConnection, 30000);
+        
+        // Listen for online/offline events
+        window.addEventListener('online', () => {
+            checkConnection();
+            setTimeout(() => {
+                window.location.reload();
+            }, 1000);
+        });
+        
+        window.addEventListener('offline', () => {
+            checkConnection();
+        });
+        
+        // Initial check
+        checkConnection();
+    </script>
+</body>
+</html>
