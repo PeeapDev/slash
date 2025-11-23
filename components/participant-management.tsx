@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
-// Removed admin-data-store - now using IndexedDB-first approach
+import type { Participant, Household } from "@/lib/offline-first-db"
 
 // Predefined relationship options for analytics and consistency
 const RELATIONSHIP_OPTIONS = [
@@ -20,11 +20,23 @@ const RELATIONSHIP_OPTIONS = [
   { value: 'other', label: 'Other' }
 ]
 
+interface ParticipantFormData {
+  householdId: string
+  fullName: string
+  age: number
+  gender: 'male' | 'female' | 'other'
+  relationToHead: string
+  consentGiven: boolean
+  projectId: string
+  occupation?: string
+  education?: string
+}
+
 export default function ParticipantManagement() {
-  const [participants, setParticipants] = useState([])
-  const [households, setHouseholds] = useState([])
+  const [participants, setParticipants] = useState<Participant[]>([])
+  const [households, setHouseholds] = useState<Household[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [editingParticipant, setEditingParticipant] = useState(null)
+  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null)
   const [filterHousehold, setFilterHousehold] = useState("all")
 
   useEffect(() => {
@@ -73,29 +85,30 @@ export default function ParticipantManagement() {
   }
 
   // INDEXEDDB-FIRST: Add participant to IndexedDB + Sync Queue
-  const handleAddParticipant = async (formData) => {
+  const handleAddParticipant = async (formData: ParticipantFormData) => {
     try {
       console.log('👥 Creating new participant in IndexedDB...')
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
 
-      const newParticipant = {
+      const newParticipant: Participant = {
         id: `PART_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        participantCode: formData.participantCode || `PART-${Date.now()}`,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        dateOfBirth: formData.dateOfBirth,
-        gender: formData.gender,
-        phone: formData.phone,
-        email: formData.email,
+        participantId: `PID-${Date.now()}`,
         householdId: formData.householdId,
-        relationshipToHead: formData.relationshipToHead || 'member',
+        fullName: formData.fullName,
+        age: formData.age,
+        gender: formData.gender,
+        relationToHead: formData.relationToHead,
         occupation: formData.occupation,
         education: formData.education,
-        status: formData.status || 'active',
+        consentGiven: formData.consentGiven,
+        consentDate: formData.consentGiven ? new Date().toISOString() : undefined,
+        projectId: formData.projectId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        syncStatus: 'pending',
+        deviceId: 'web_app',
+        collectorId: 'current_user',
+        syncStatus: 'pending' as const,
         version: 1
       }
 
@@ -110,19 +123,31 @@ export default function ParticipantManagement() {
   }
 
   // INDEXEDDB-FIRST: Update participant in IndexedDB + Sync Queue
-  const handleUpdateParticipant = async (id, formData) => {
+  const handleUpdateParticipant = async (id: string, formData: ParticipantFormData) => {
     try {
       console.log(`👥 Updating participant ${id} in IndexedDB...`)
       const { offlineDB } = await import('@/lib/offline-first-db')
       await offlineDB.init()
 
-      const updatedData = {
-        ...formData,
+      const existingParticipant = await offlineDB.getById('participants', id) as Participant
+      
+      const updatedParticipant: Participant = {
+        ...existingParticipant,
+        fullName: formData.fullName,
+        age: formData.age,
+        gender: formData.gender,
+        relationToHead: formData.relationToHead,
+        occupation: formData.occupation,
+        education: formData.education,
+        consentGiven: formData.consentGiven,
+        householdId: formData.householdId,
+        projectId: formData.projectId,
         updatedAt: new Date().toISOString(),
-        syncStatus: 'pending'
+        syncStatus: 'pending' as const,
+        version: (existingParticipant.version || 1) + 1
       }
 
-      await offlineDB.update('participants', id, updatedData)
+      await offlineDB.update('participants', id, updatedParticipant)
       console.log('✅ Participant updated in IndexedDB + added to sync queue')
       
       await loadParticipants() // Refresh from IndexedDB
@@ -133,7 +158,7 @@ export default function ParticipantManagement() {
   }
 
   // INDEXEDDB-FIRST: Delete participant from IndexedDB + Sync Queue
-  const handleDeleteParticipant = async (id) => {
+  const handleDeleteParticipant = async (id: string) => {
     if (confirm("Are you sure you want to delete this participant?")) {
       try {
         console.log(`👥 Deleting participant ${id} from IndexedDB...`)
@@ -150,10 +175,16 @@ export default function ParticipantManagement() {
     }
   }
 
-  const filteredParticipants = participants.filter((p) => {
+  const filteredParticipants = participants.filter((p: Participant) => {
     const householdMatch = filterHousehold === "all" || p.householdId === filterHousehold
     return householdMatch
   })
+
+  // Helper to get household name by ID
+  const getHouseholdName = (householdId: string) => {
+    const household = households.find(h => h.id === householdId)
+    return household ? household.headOfHousehold : householdId
+  }
 
   return (
     <div className="space-y-6">
@@ -179,9 +210,9 @@ export default function ParticipantManagement() {
             className="px-3 py-2 border border-border rounded-lg text-sm"
           >
             <option value="all">All Households</option>
-            {households.map((h) => (
+            {households.map((h: Household) => (
               <option key={h.id} value={h.id}>
-                {h.id} - {h.headName}
+                {h.householdId} - {h.headOfHousehold}
               </option>
             ))}
           </select>
@@ -206,23 +237,23 @@ export default function ParticipantManagement() {
             </thead>
             <tbody>
               {filteredParticipants.length > 0 ? (
-                filteredParticipants.map((participant) => (
+                filteredParticipants.map((participant: Participant) => (
                   <tr key={participant.id} className="border-b border-border hover:bg-muted/50">
-                    <td className="py-4 px-6 font-mono text-xs font-medium">{participant.id}</td>
-                    <td className="py-4 px-6 font-medium">{participant.name}</td>
+                    <td className="py-4 px-6 font-mono text-xs font-medium">{participant.participantId}</td>
+                    <td className="py-4 px-6 font-medium">{participant.fullName}</td>
                     <td className="py-4 px-6">{participant.age}</td>
-                    <td className="py-4 px-6 capitalize">{participant.sex}</td>
-                    <td className="py-4 px-6">{participant.relationship}</td>
+                    <td className="py-4 px-6 capitalize">{participant.gender}</td>
+                    <td className="py-4 px-6 capitalize">{participant.relationToHead}</td>
                     <td className="py-4 px-6">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          participant.consent ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                          participant.consentGiven ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
                         }`}
                       >
-                        {participant.consent ? "Yes" : "No"}
+                        {participant.consentGiven ? "Yes" : "No"}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-xs">{participant.householdId}</td>
+                    <td className="py-4 px-6 text-xs">{getHouseholdName(participant.householdId)}</td>
                     <td className="py-4 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -277,28 +308,39 @@ export default function ParticipantManagement() {
   )
 }
 
-function ParticipantFormModal({ participant, households, onSave, onClose }) {
+interface ParticipantFormModalProps {
+  participant: Participant | null
+  households: Household[]
+  onSave: (data: ParticipantFormData) => void
+  onClose: () => void
+}
+
+function ParticipantFormModal({ participant, households, onSave, onClose }: ParticipantFormModalProps) {
   // Get selected household details for participant count tracking
-  const [selectedHousehold, setSelectedHousehold] = useState(null)
+  const [selectedHousehold, setSelectedHousehold] = useState<Household | null>(null)
   const [participantCount, setParticipantCount] = useState({ expected: 0, registered: 0 })
   
-  const [formData, setFormData] = useState(
+  const [formData, setFormData] = useState<ParticipantFormData>(
     participant ? {
-      householdId: participant.householdId || "",
-      name: participant.name || participant.firstName + " " + (participant.lastName || ""),
-      age: participant.age || 0,
-      sex: participant.sex || participant.gender || "male",
-      relationship: participant.relationship || participant.relationshipToHead || "",
-      consent: participant.consent !== undefined ? participant.consent : true,
-      projectId: participant.projectId || "",
+      householdId: participant.householdId,
+      fullName: participant.fullName,
+      age: participant.age,
+      gender: participant.gender,
+      relationToHead: participant.relationToHead,
+      consentGiven: participant.consentGiven,
+      projectId: participant.projectId,
+      occupation: participant.occupation,
+      education: participant.education,
     } : {
       householdId: "",
-      name: "",
+      fullName: "",
       age: 0,
-      sex: "male",
-      relationship: "",
-      consent: true,
+      gender: "male" as const,
+      relationToHead: "",
+      consentGiven: true,
       projectId: "",
+      occupation: "",
+      education: "",
     },
   )
   
@@ -319,7 +361,7 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
             const householdParticipants = allParticipants.filter(p => p.householdId === formData.householdId)
             
             setParticipantCount({
-              expected: household.totalMembers || 0,
+              expected: household.familySize || 0,
               registered: householdParticipants.length
             })
           }
@@ -332,7 +374,7 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
     loadParticipantCount()
   }, [formData.householdId, households])
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSave(formData)
   }
@@ -352,9 +394,9 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
               className="w-full px-3 py-2 border border-border rounded-lg"
             >
               <option value="">Select Household</option>
-              {households.map((h) => (
+              {households.map((h: Household) => (
                 <option key={h.id} value={h.id}>
-                  {h.householdId} - {h.headName}
+                  {h.householdId} - {h.headOfHousehold}
                 </option>
               ))}
             </select>
@@ -363,7 +405,7 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
             {selectedHousehold && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="text-sm font-medium text-blue-800 mb-2">
-                  📊 Household: {selectedHousehold.headName}
+                  📊 Household: {selectedHousehold.headOfHousehold}
                 </div>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
@@ -394,13 +436,14 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Name</label>
+              <label className="block text-sm font-medium mb-2">Full Name</label>
               <input
                 type="text"
                 required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                 className="w-full px-3 py-2 border border-border rounded-lg"
+                placeholder="Enter participant's full name"
               />
             </div>
             <div>
@@ -418,10 +461,10 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Sex</label>
+              <label className="block text-sm font-medium mb-2">Gender</label>
               <select
-                value={formData.sex}
-                onChange={(e) => setFormData({ ...formData, sex: e.target.value })}
+                value={formData.gender}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value as 'male' | 'female' | 'other' })}
                 className="w-full px-3 py-2 border border-border rounded-lg"
               >
                 <option value="male">Male</option>
@@ -433,8 +476,8 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
               <label className="block text-sm font-medium mb-2">Relationship to Head</label>
               <select
                 required
-                value={formData.relationship}
-                onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
+                value={formData.relationToHead}
+                onChange={(e) => setFormData({ ...formData, relationToHead: e.target.value })}
                 className="w-full px-3 py-2 border border-border rounded-lg"
               >
                 <option value="">Select Relationship</option>
@@ -451,8 +494,8 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
             <input
               type="checkbox"
               id="consent"
-              checked={formData.consent}
-              onChange={(e) => setFormData({ ...formData, consent: e.target.checked })}
+              checked={formData.consentGiven}
+              onChange={(e) => setFormData({ ...formData, consentGiven: e.target.checked })}
               className="w-4 h-4 border border-border rounded"
             />
             <label htmlFor="consent" className="text-sm font-medium">
@@ -461,7 +504,7 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
           </div>
 
           <div className="flex gap-2 justify-end pt-4">
-            <Button variant="outline" onClick={onClose}>
+            <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
             <Button type="submit">Save Participant</Button>
