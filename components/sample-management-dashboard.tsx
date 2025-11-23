@@ -19,8 +19,10 @@ import {
   CheckCircle,
   XCircle,
   Beaker,
-  Microscope
+  Microscope,
+  ArrowLeft
 } from "lucide-react"
+import DynamicSampleForm from "./dynamic-sample-form"
 
 interface Sample {
   id: string
@@ -57,6 +59,7 @@ export default function SampleManagementDashboard() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [sampleTypeFilter, setSampleTypeFilter] = useState('')
+  const [showNewSampleForm, setShowNewSampleForm] = useState(false)
 
   // Mock user context - in real app, get from auth
   const currentUser = {
@@ -224,6 +227,42 @@ export default function SampleManagementDashboard() {
     }
   }
 
+  const handleNewSampleSubmit = (sampleData: any) => {
+    console.log('New sample created:', sampleData)
+    setShowNewSampleForm(false)
+    // Refresh the samples list
+    loadSamples()
+    loadStats()
+  }
+
+  const handleCancelNewSample = () => {
+    setShowNewSampleForm(false)
+  }
+
+  // Show new sample form if requested
+  if (showNewSampleForm) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="outline" 
+            onClick={handleCancelNewSample}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </Button>
+          <h2 className="text-xl font-semibold">Create New Sample</h2>
+        </div>
+        
+        <DynamicSampleForm 
+          onSubmit={handleNewSampleSubmit}
+          onCancel={handleCancelNewSample}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -241,7 +280,7 @@ export default function SampleManagementDashboard() {
             Export
           </Button>
           {(currentUser.role === 'field_collector' || currentUser.role === 'superadmin') && (
-            <Button>
+            <Button onClick={() => setShowNewSampleForm(true)}>
               <Plus className="w-4 h-4 mr-1" />
               New Sample
             </Button>
