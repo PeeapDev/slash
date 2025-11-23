@@ -6,6 +6,20 @@ import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
 // Removed admin-data-store - now using IndexedDB-first approach
 
+// Predefined relationship options for analytics and consistency
+const RELATIONSHIP_OPTIONS = [
+  { value: 'head', label: 'Head of Household' },
+  { value: 'spouse', label: 'Spouse/Partner' },
+  { value: 'child', label: 'Child' },
+  { value: 'parent', label: 'Parent' },
+  { value: 'sibling', label: 'Sibling' },
+  { value: 'grandparent', label: 'Grandparent' },
+  { value: 'grandchild', label: 'Grandchild' },
+  { value: 'relative', label: 'Other Relative' },
+  { value: 'non_relative', label: 'Non-Relative' },
+  { value: 'other', label: 'Other' }
+]
+
 export default function ParticipantManagement() {
   const [participants, setParticipants] = useState([])
   const [households, setHouseholds] = useState([])
@@ -264,8 +278,20 @@ export default function ParticipantManagement() {
 }
 
 function ParticipantFormModal({ participant, households, onSave, onClose }) {
+  // Get selected household details for participant count tracking
+  const [selectedHousehold, setSelectedHousehold] = useState(null)
+  const [participantCount, setParticipantCount] = useState({ expected: 0, registered: 0 })
+  
   const [formData, setFormData] = useState(
-    participant || {
+    participant ? {
+      householdId: participant.householdId || "",
+      name: participant.name || participant.firstName + " " + (participant.lastName || ""),
+      age: participant.age || 0,
+      sex: participant.sex || participant.gender || "male",
+      relationship: participant.relationship || participant.relationshipToHead || "",
+      consent: participant.consent !== undefined ? participant.consent : true,
+      projectId: participant.projectId || "",
+    } : {
       householdId: "",
       name: "",
       age: 0,
@@ -275,6 +301,36 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
       projectId: "",
     },
   )
+  
+  // Load participant count when household is selected
+  useEffect(() => {
+    const loadParticipantCount = async () => {
+      if (formData.householdId) {
+        try {
+          const household = households.find(h => h.id === formData.householdId)
+          setSelectedHousehold(household)
+          
+          if (household) {
+            const { offlineDB } = await import('@/lib/offline-first-db')
+            await offlineDB.init()
+            
+            // Get all participants for this household
+            const allParticipants = await offlineDB.getAll('participants')
+            const householdParticipants = allParticipants.filter(p => p.householdId === formData.householdId)
+            
+            setParticipantCount({
+              expected: household.totalMembers || 0,
+              registered: householdParticipants.length
+            })
+          }
+        } catch (error) {
+          console.error('Error loading participant count:', error)
+        }
+      }
+    }
+    
+    loadParticipantCount()
+  }, [formData.householdId, households])
 
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -298,10 +354,42 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
               <option value="">Select Household</option>
               {households.map((h) => (
                 <option key={h.id} value={h.id}>
-                  {h.id} - {h.headName}
+                  {h.householdId} - {h.headName}
                 </option>
               ))}
             </select>
+            
+            {/* Participant Count Tracking */}
+            {selectedHousehold && (
+              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm font-medium text-blue-800 mb-2">
+                  📊 Household: {selectedHousehold.headName}
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="text-lg font-bold text-blue-600">{participantCount.expected}</div>
+                    <div className="text-xs text-blue-600">Expected</div>
+                  </div>
+                  <div>
+                    <div className="text-lg font-bold text-green-600">{participantCount.registered}</div>
+                    <div className="text-xs text-green-600">Registered</div>
+                  </div>
+                  <div>
+                    <div className={`text-lg font-bold ${participantCount.expected - participantCount.registered > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                      {participantCount.expected - participantCount.registered}
+                    </div>
+                    <div className={`text-xs ${participantCount.expected - participantCount.registered > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                      {participantCount.expected - participantCount.registered > 0 ? 'Missing' : 'Complete'}
+                    </div>
+                  </div>
+                </div>
+                {participantCount.expected - participantCount.registered > 0 && (
+                  <div className="mt-2 text-xs text-orange-700">
+                    ⚠️ This household still needs {participantCount.expected - participantCount.registered} more participant(s)
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -343,13 +431,19 @@ function ParticipantFormModal({ participant, households, onSave, onClose }) {
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">Relationship to Head</label>
-              <input
-                type="text"
-                placeholder="e.g., Child, Spouse, Parent"
+              <select
+                required
                 value={formData.relationship}
                 onChange={(e) => setFormData({ ...formData, relationship: e.target.value })}
                 className="w-full px-3 py-2 border border-border rounded-lg"
-              />
+              >
+                <option value="">Select Relationship</option>
+                {RELATIONSHIP_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

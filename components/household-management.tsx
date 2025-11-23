@@ -72,6 +72,7 @@ export default function HouseholdManagement() {
   const [regions, setRegions] = useState<Region[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingHousehold, setEditingHousehold] = useState<Household | null>(null)
+  const [viewingHousehold, setViewingHousehold] = useState<Household | null>(null)
   const [filterProject, setFilterProject] = useState("all")
   const [filterRegion, setFilterRegion] = useState("all")
   const [filterStatus, setFilterStatus] = useState("all")
@@ -396,7 +397,11 @@ export default function HouseholdManagement() {
                             </button>
                           </>
                         )}
-                        <button className="p-1 hover:bg-muted rounded" title="View details">
+                        <button 
+                          onClick={() => setViewingHousehold(household)}
+                          className="p-1 hover:bg-muted rounded" 
+                          title="View details"
+                        >
                           <Eye size={16} />
                         </button>
                       </div>
@@ -433,6 +438,102 @@ export default function HouseholdManagement() {
             setEditingHousehold(null)
           }}
         />
+      )}
+      
+      {/* Household View Modal */}
+      {viewingHousehold && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold">Household Details</h2>
+              <button 
+                onClick={() => setViewingHousehold(null)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Household ID</label>
+                  <p className="text-sm font-mono bg-gray-50 p-2 rounded">{viewingHousehold.householdId}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Status</label>
+                  <p className={`text-sm font-medium ${viewingHousehold.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+                    {viewingHousehold.status.toUpperCase()}
+                  </p>
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-sm font-medium text-gray-600">Head of Household</label>
+                <p className="text-lg font-medium">{viewingHousehold.headName}</p>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Region</label>
+                  <p>{viewingHousehold.region}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">District</label>
+                  <p>{viewingHousehold.district}</p>
+                </div>
+              </div>
+              
+              {viewingHousehold.address && (
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Address</label>
+                  <p>{viewingHousehold.address}</p>
+                </div>
+              )}
+              
+              {viewingHousehold.gpsCoordinates && (
+                <div>
+                  <label className="text-sm font-medium text-gray-600">GPS Coordinates</label>
+                  <p className="font-mono text-sm">{viewingHousehold.gpsCoordinates}</p>
+                </div>
+              )}
+              
+              <div className="grid grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-blue-600">{viewingHousehold.totalMembers}</p>
+                  <p className="text-xs text-gray-600">Total Members</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-green-600">{viewingHousehold.numParticipants || 0}</p>
+                  <p className="text-xs text-gray-600">Participants</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-purple-600">
+                    {(viewingHousehold.numSamplesUrine || 0) + (viewingHousehold.numSamplesBlood || 0)}
+                  </p>
+                  <p className="text-xs text-gray-600">Total Samples</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <Button 
+                variant="outline" 
+                onClick={() => setViewingHousehold(null)}
+              >
+                Close
+              </Button>
+              <Button 
+                onClick={() => {
+                  setEditingHousehold(viewingHousehold)
+                  setViewingHousehold(null)
+                }}
+              >
+                Edit Household
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
