@@ -93,7 +93,7 @@ export default function HouseholdManagement() {
       
       const localHouseholds = await offlineDB.getAll('households')
       console.log(`✅ Loaded ${localHouseholds.length} households from IndexedDB`)
-      setHouseholds(localHouseholds)
+      setHouseholds(localHouseholds as Household[])
       
       if (localHouseholds.length === 0) {
         console.log('ℹ️ No households found in IndexedDB - create households to see them here')
@@ -141,11 +141,11 @@ export default function HouseholdManagement() {
       
       // Try to get user from settings store
       const userSettings = await offlineDB.getAll('settings')
-      const currentUserSetting = userSettings.find(s => s.key === 'current_user')
+      const currentUserSetting = userSettings.find((s: any) => s.key === 'current_user')
       
       if (currentUserSetting && currentUserSetting.value) {
-        setUserRole(currentUserSetting.value.role || 'superadmin')
-        console.log(`✅ Loaded user role: ${currentUserSetting.value.role}`)
+        setUserRole((currentUserSetting.value as any).role || 'superadmin')
+        console.log(`✅ Loaded user role: ${(currentUserSetting.value as any).role}`)
       } else {
         // Default to superadmin if no user found
         setUserRole('superadmin')
