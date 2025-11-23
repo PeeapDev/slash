@@ -43,7 +43,8 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ user, onLogout, currentPage, onPageChange }: AdminLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false) // Default closed on mobile
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   // Internal page state fallback when onPageChange/currentPage are not provided
   const [internalPage, setInternalPage] = useState<string>(currentPage || "dashboard")
   const page = currentPage ?? internalPage
@@ -54,6 +55,7 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
     } else {
       setInternalPage(pageId)
     }
+    setIsMobileMenuOpen(false) // Close mobile menu after selection
   }
 
   const adminMenuItems = [
@@ -133,44 +135,52 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
   }
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sidebar */}
+    <div className="flex h-screen bg-background overflow-hidden">
+      {/* Mobile Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Mobile Slide-out */}
       <div
         className={`${
-          sidebarOpen ? "w-64" : "w-20"
-        } bg-card border-r border-border transition-all duration-300 flex flex-col`}
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        } lg:translate-x-0 fixed lg:relative z-50 h-full w-64 bg-card border-r border-border transition-transform duration-300 flex flex-col`}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-border flex items-center justify-between">
-          {sidebarOpen && <h1 className="text-lg font-bold">SLASH Admin</h1>}
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-1 hover:bg-muted rounded">
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        <div className="p-4 lg:p-6 border-b border-border flex items-center justify-between">
+          <h1 className="text-lg font-bold">SLASH</h1>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="lg:hidden p-1 hover:bg-muted rounded"
+          >
+            <X size={20} />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto p-4 space-y-1">
+        <nav className="flex-1 overflow-y-auto p-3 lg:p-4 space-y-1">
           {['Overview', 'Field Work', 'Laboratory', 'Administration', 'System'].map((section) => {
             const sectionItems = adminMenuItems.filter(item => item.section === section)
             return (
-              <div key={section} className="mb-4">
-                {sidebarOpen && (
-                  <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                    {section}
-                  </div>
-                )}
+              <div key={section} className="mb-3">
+                <div className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  {section}
+                </div>
                 <div className="space-y-1">
                   {sectionItems.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => changePage(item.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-2 rounded-lg text-left text-sm font-medium transition-colors ${
+                      className={`w-full flex items-center gap-3 px-4 py-3 lg:py-2 rounded-lg text-left text-sm font-medium transition-colors touch-manipulation ${
                         page === item.id ? "bg-primary text-primary-foreground" : "hover:bg-muted text-foreground"
                       }`}
-                      title={!sidebarOpen ? item.label : undefined}
                     >
                       <span className="text-xl">{item.icon}</span>
-                      {sidebarOpen && <span>{item.label}</span>}
+                      <span>{item.label}</span>
                     </button>
                   ))}
                 </div>
@@ -181,34 +191,86 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top Header */}
-        <div className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
-          <div>
+      <div className="flex-1 flex flex-col overflow-hidden w-full">
+        {/* Top Header - Mobile Optimized */}
+        <div className="h-14 lg:h-16 bg-card border-b border-border flex items-center justify-between px-3 lg:px-6">
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="lg:hidden p-2 hover:bg-muted rounded-lg touch-manipulation"
+          >
+            <Menu size={24} />
+          </button>
+
+          {/* User Info - Hidden on mobile */}
+          <div className="hidden lg:block">
             <h2 className="text-sm text-muted-foreground">Welcome back</h2>
             <p className="font-semibold">{user?.email || "SuperAdmin"}</p>
           </div>
 
-          <div className="flex items-center gap-4">
-            <SyncStatus compact />
-            <NetworkStatus />
+          {/* Mobile Title */}
+          <h1 className="lg:hidden font-bold text-lg">SLASH</h1>
+
+          {/* Actions - Responsive */}
+          <div className="flex items-center gap-2 lg:gap-4">
+            <div className="hidden md:flex items-center gap-2">
+              <SyncStatus compact />
+              <NetworkStatus />
+            </div>
             <ThemeToggle />
-            <button className="p-2 hover:bg-muted rounded-lg">
+            <button className="hidden lg:block p-2 hover:bg-muted rounded-lg">
               <Bell size={20} />
-            </button>
-            <button className="p-2 hover:bg-muted rounded-lg">
-              <Settings size={20} />
             </button>
             <Button onClick={onLogout} variant="ghost" size="sm" className="gap-2">
               <LogOut size={18} />
-              Logout
+              <span className="hidden lg:inline">Logout</span>
             </Button>
           </div>
         </div>
 
-        {/* Page Content */}
+        {/* Page Content - Mobile Optimized */}
         <div className="flex-1 overflow-auto">
-          <div className="p-6">{renderPage()}</div>
+          <div className="p-3 lg:p-6 pb-20 lg:pb-6">{renderPage()}</div>
+        </div>
+
+        {/* Mobile Bottom Navigation */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border z-30">
+          <div className="flex items-center justify-around py-2 px-2">
+            <button
+              onClick={() => changePage('dashboard')}
+              className={`flex flex-col items-center gap-1 p-2 rounded-lg touch-manipulation ${
+                page === 'dashboard' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <span className="text-xl">📊</span>
+              <span className="text-xs">Home</span>
+            </button>
+            <button
+              onClick={() => changePage('households')}
+              className={`flex flex-col items-center gap-1 p-2 rounded-lg touch-manipulation ${
+                page === 'households' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <span className="text-xl">🏠</span>
+              <span className="text-xs">Data</span>
+            </button>
+            <button
+              onClick={() => changePage('samples')}
+              className={`flex flex-col items-center gap-1 p-2 rounded-lg touch-manipulation ${
+                page === 'samples' ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              <span className="text-xl">🧪</span>
+              <span className="text-xs">Samples</span>
+            </button>
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="flex flex-col items-center gap-1 p-2 rounded-lg touch-manipulation text-muted-foreground"
+            >
+              <Menu size={20} />
+              <span className="text-xs">Menu</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

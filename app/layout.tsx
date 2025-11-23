@@ -51,8 +51,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
   userScalable: true,
   themeColor: "#1e293b",
+  viewportFit: "cover", // For notched devices
 }
 
 export default function RootLayout({

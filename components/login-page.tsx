@@ -47,11 +47,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-3 md:p-4">
       {/* PWA Install Popup */}
       <PWAInstallPopup />
       
-      <Card className="w-full max-w-md p-8 shadow-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 relative">
+      <Card className="w-full max-w-md p-6 md:p-8 shadow-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 relative">
         {/* Theme Toggle - Top Right */}
         <div className="absolute top-4 right-4">
           <ThemeToggle />
