@@ -366,7 +366,7 @@ function ProjectFormModal({ project, regions, projectTypes, onSave, onClose }: P
     },
   )
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     onSave(formData)
   }

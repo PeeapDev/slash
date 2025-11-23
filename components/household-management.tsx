@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2, Eye } from "lucide-react"
-import { getHouseholds, addHousehold, updateHousehold, deleteHousehold, getProjects } from "@/lib/admin-data-store"
+// Removed admin-data-store - now using IndexedDB-first approach
 import { SIERRA_LEONE_REGIONS, getDistrictsByRegion } from "@/lib/sierra-leone-regions"
 
 export default function HouseholdManagement() {
@@ -19,35 +19,125 @@ export default function HouseholdManagement() {
   const [userRole, setUserRole] = useState("superadmin")
 
   useEffect(() => {
-    setHouseholds(getHouseholds())
-    setProjects(getProjects())
+    loadHouseholds()
+    loadProjects()
     setRegions(SIERRA_LEONE_REGIONS)
     const user = JSON.parse(localStorage.getItem("current_user") || '{"role":"superadmin"}')
     setUserRole(user.role)
   }, [])
 
-  const handleAddHousehold = (formData) => {
-    const newHousehold = {
-      id: `HH-${Date.now()}`,
-      ...formData,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+  // INDEXEDDB-FIRST: Load households from IndexedDB
+  const loadHouseholds = async () => {
+    try {
+      console.log('🏠 Loading households from IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localHouseholds = await offlineDB.getAll('households')
+      console.log(`✅ Loaded ${localHouseholds.length} households from IndexedDB`)
+      setHouseholds(localHouseholds)
+      
+      if (localHouseholds.length === 0) {
+        console.log('ℹ️ No households found in IndexedDB - create households to see them here')
+      }
+    } catch (error) {
+      console.error('❌ Error loading households from IndexedDB:', error)
+      setHouseholds([])
     }
-    addHousehold(newHousehold)
-    setHouseholds(getHouseholds())
-    setShowForm(false)
   }
 
-  const handleUpdateHousehold = (id, formData) => {
-    updateHousehold(id, formData)
-    setHouseholds(getHouseholds())
-    setEditingHousehold(null)
+  // INDEXEDDB-FIRST: Load projects from IndexedDB
+  const loadProjects = async () => {
+    try {
+      console.log('📊 Loading projects for household dropdown...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localProjects = await offlineDB.getAll('project_metadata')
+      console.log(`✅ Loaded ${localProjects.length} projects from IndexedDB`)
+      setProjects(localProjects)
+      
+      if (localProjects.length === 0) {
+        console.log('ℹ️ No projects found - create projects first to assign households')
+      }
+    } catch (error) {
+      console.error('❌ Error loading projects from IndexedDB:', error)
+      setProjects([])
+    }
   }
 
-  const handleDeleteHousehold = (id) => {
+  // INDEXEDDB-FIRST: Add household to IndexedDB + Sync Queue
+  const handleAddHousehold = async (formData) => {
+    try {
+      console.log('🏠 Creating new household in IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const newHousehold = {
+        id: `HH_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        householdId: formData.householdId || `HH-${Date.now()}`,
+        headName: formData.headName,
+        region: formData.region,
+        district: formData.district,
+        address: formData.address,
+        gpsCoordinates: formData.gpsCoordinates,
+        totalMembers: parseInt(formData.totalMembers) || 0,
+        projectId: formData.projectId,
+        status: formData.status || 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending',
+        version: 1
+      }
+
+      await offlineDB.create('households', newHousehold)
+      console.log('✅ Household created in IndexedDB + added to sync queue')
+      
+      await loadHouseholds() // Refresh from IndexedDB
+      setShowForm(false)
+    } catch (error) {
+      console.error('❌ Error creating household:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Update household in IndexedDB + Sync Queue
+  const handleUpdateHousehold = async (id, formData) => {
+    try {
+      console.log(`🏠 Updating household ${id} in IndexedDB...`)
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+
+      const updatedData = {
+        ...formData,
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'pending'
+      }
+
+      await offlineDB.update('households', id, updatedData)
+      console.log('✅ Household updated in IndexedDB + added to sync queue')
+      
+      await loadHouseholds() // Refresh from IndexedDB
+      setEditingHousehold(null)
+    } catch (error) {
+      console.error('❌ Error updating household:', error)
+    }
+  }
+
+  // INDEXEDDB-FIRST: Delete household from IndexedDB + Sync Queue
+  const handleDeleteHousehold = async (id) => {
     if (confirm("Are you sure you want to delete this household?")) {
-      deleteHousehold(id)
-      setHouseholds(getHouseholds())
+      try {
+        console.log(`🏠 Deleting household ${id} from IndexedDB...`)
+        const { offlineDB } = await import('@/lib/offline-first-db')
+        await offlineDB.init()
+
+        await offlineDB.delete('households', id)
+        console.log('✅ Household deleted from IndexedDB + added to sync queue')
+        
+        await loadHouseholds() // Refresh from IndexedDB
+      } catch (error) {
+        console.error('❌ Error deleting household:', error)
+      }
     }
   }
 
