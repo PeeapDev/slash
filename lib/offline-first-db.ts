@@ -302,7 +302,7 @@ export interface OfflineDBSchema {
 // Offline-First Database Service
 class OfflineFirstDB {
   private dbName = 'SLASH_FIELDWORK_DB'
-  private dbVersion = 2 // Increased for new schema
+  private dbVersion = 3 // Increased for sample_types store
   private db: IDBDatabase | null = null
   private deviceId: string
   private collectorId: string

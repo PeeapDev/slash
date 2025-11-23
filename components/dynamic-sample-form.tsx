@@ -95,6 +95,35 @@ export default function DynamicSampleForm({
       const localTypes = await offlineDB.getAll('sample_types')
       console.log(`✅ Loaded ${localTypes.length} sample types from IndexedDB`)
 
+      if (localTypes.length === 0) {
+        console.log('⚠️ No sample types found in IndexedDB - using fallback types')
+        // Use fallback types if none exist
+        const fallbackTypes = [
+          { 
+            id: 'BLOOD', 
+            type_code: 'BLOOD', 
+            display_name: 'Blood Sample', 
+            description: 'Basic blood collection',
+            form_schema: { fields: [
+              { name: 'volume_collected', type: 'number', label: 'Volume (mL)', required: true },
+              { name: 'collection_notes', type: 'textarea', label: 'Collection Notes', required: false }
+            ] }
+          },
+          { 
+            id: 'URINE', 
+            type_code: 'URINE', 
+            display_name: 'Urine Sample', 
+            description: 'Basic urine collection',
+            form_schema: { fields: [
+              { name: 'volume_collected', type: 'number', label: 'Volume (mL)', required: true },
+              { name: 'collection_notes', type: 'textarea', label: 'Collection Notes', required: false }
+            ] }
+          }
+        ]
+        setSampleTypes(fallbackTypes)
+        return
+      }
+
       // Format for form compatibility
       const formattedTypes = localTypes.map((type: any) => ({
         id: type.id,
@@ -108,7 +137,8 @@ export default function DynamicSampleForm({
       
       setSampleTypes(formattedTypes)
     } catch (error) {
-      console.error('Error loading sample types:', error)
+      console.error('❌ Error loading sample types:', error)
+      console.log('🔧 Using fallback sample types due to IndexedDB error')
       // Fallback to basic types if IndexedDB fails
       setSampleTypes([
         { 
@@ -116,7 +146,20 @@ export default function DynamicSampleForm({
           type_code: 'BLOOD', 
           display_name: 'Blood Sample', 
           description: 'Basic blood collection',
-          form_schema: { fields: [] }
+          form_schema: { fields: [
+            { name: 'volume_collected', type: 'number', label: 'Volume (mL)', required: true },
+            { name: 'collection_notes', type: 'textarea', label: 'Collection Notes', required: false }
+          ] }
+        },
+        { 
+          id: 'URINE', 
+          type_code: 'URINE', 
+          display_name: 'Urine Sample', 
+          description: 'Basic urine collection',
+          form_schema: { fields: [
+            { name: 'volume_collected', type: 'number', label: 'Volume (mL)', required: true },
+            { name: 'collection_notes', type: 'textarea', label: 'Collection Notes', required: false }
+          ] }
         }
       ])
     }
@@ -174,7 +217,7 @@ export default function DynamicSampleForm({
       setParticipants(participants)
       console.log(`✅ Loaded ${participants.length} participants from local config`)
     } catch (error) {
-      console.error('Error loading participants:', error)
+      console.error('❌ Error loading participants:', error)
       setParticipants([])
     }
   }
