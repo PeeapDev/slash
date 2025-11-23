@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
-// import { getProjects, addProject, updateProject, deleteProject } from "@/lib/admin-data-store"
+import { offlineDB, ProjectMetadata } from "@/lib/offline-first-db"
+import { syncEngine } from "@/lib/sync-engine"
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
 
 export default function ProjectManagement() {
@@ -23,19 +24,34 @@ export default function ProjectManagement() {
     setUserRole(user.role)
   }, [])
 
-  // Load projects from database API
+  // Load projects from IndexedDB (offline-first)
   const loadProjects = async () => {
     try {
-      const response = await fetch('/api/projects')
-      const data = await response.json()
-      if (data.success) {
-        setProjects(data.data)
-      } else {
-        console.error('Failed to load projects:', data.error)
-        setProjects([])
+      console.log('📊 Loading projects from IndexedDB...')
+      await offlineDB.init()
+      
+      // Get projects from local IndexedDB first
+      const localProjects = await offlineDB.getAll<ProjectMetadata>('project_metadata')
+      console.log(`✅ Loaded ${localProjects.length} projects from IndexedDB`)
+      
+      setProjects(localProjects as any)
+      
+      // If online, also try to fetch from API to sync any server updates
+      if (navigator.onLine) {
+        try {
+          const response = await fetch('/api/projects')
+          const data = await response.json()
+          if (data.success && data.data.length > 0) {
+            console.log(`🔄 Found ${data.data.length} projects in Neon, syncing...`)
+            // Server data available, but we stick to offline-first principle
+            // Sync engine will handle the proper merging
+          }
+        } catch (error) {
+          console.log('📴 API unavailable, continuing with offline data')
+        }
       }
     } catch (error) {
-      console.error('Error loading projects:', error)
+      console.error('❌ Error loading projects from IndexedDB:', error)
       setProjects([])
     }
   }
@@ -55,34 +71,51 @@ export default function ProjectManagement() {
 
   const handleAddProject = async (formData: any) => {
     try {
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          projectCode: formData.code || `PROJECT-${Date.now()}`,
-          projectName: formData.name,
-          description: formData.description,
-          regionIds: formData.regions || [],
-          districtIds: formData.districts || [],
-          expectedSampleTypes: formData.type === 'blood_sample' ? ['BLOOD'] : 
-                             formData.type === 'urine_sample' ? ['URINE'] : 
-                             ['URINE', 'BLOOD'],
-          targetSamplesCount: formData.targetSamples || 0,
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          createdBy: 'admin'
-        })
-      })
+      console.log('🎯 Creating project in IndexedDB first...', formData)
       
-      if (response.ok) {
-        await loadProjects() // Refresh the list
-        setShowForm(false)
-      } else {
-        const error = await response.json()
-        console.error('Failed to create project:', error.error)
+      // Create project in IndexedDB first (offline-first approach)
+      const projectData = {
+        projectId: `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        projectName: formData.name,
+        projectCode: formData.code || `PROJECT-${Date.now()}`,
+        description: formData.description || '',
+        principalInvestigator: formData.pi || 'TBD',
+        studyPeriod: {
+          start: formData.startDate || new Date().toISOString().split('T')[0],
+          end: formData.endDate || new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        },
+        targetSampleSize: formData.targetSamples || 0,
+        regions: formData.regions || [],
+        districts: formData.districts || [],
+        assignments: [],
+        milestones: [],
+        samplingQuotas: [],
+        activeModules: ['households', 'participants', 'samples'],
+        configurations: { 
+          sampleTypes: formData.type === 'blood_sample' ? ['BLOOD'] : 
+                      formData.type === 'urine_sample' ? ['URINE'] : 
+                      ['URINE', 'BLOOD']
+        }
       }
+
+      // Save to IndexedDB first
+      await offlineDB.create<ProjectMetadata>('project_metadata', projectData)
+      console.log('✅ Project saved to IndexedDB')
+      
+      // Trigger sync to Neon database
+      if (navigator.onLine) {
+        console.log('🔄 Triggering sync to Neon...')
+        await syncEngine.syncNow()
+      } else {
+        console.log('📴 Offline - project queued for sync when online')
+      }
+      
+      // Refresh local list
+      await loadProjects()
+      setShowForm(false)
+      
     } catch (error) {
-      console.error('Error creating project:', error)
+      console.error('❌ Error creating project:', error)
     }
   }
 

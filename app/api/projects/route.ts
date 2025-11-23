@@ -3,7 +3,10 @@ import { ProjectService } from '@/lib/sample-services'
 
 export async function GET() {
   try {
+    console.log('📥 API: Fetching projects from Neon database...')
     const projects = await ProjectService.getAllProjects()
+    
+    console.log(`✅ API: Found ${projects.length} projects in Neon`)
     
     return NextResponse.json({ 
       success: true, 
@@ -11,9 +14,9 @@ export async function GET() {
       count: projects.length
     })
   } catch (error) {
-    console.error('Error fetching projects:', error)
+    console.error('❌ API: Error fetching projects:', error)
     return NextResponse.json(
-      { success: false, error: 'Failed to fetch projects' },
+      { success: false, error: `Failed to fetch projects: ${(error as Error).message}` },
       { status: 500 }
     )
   }

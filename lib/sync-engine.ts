@@ -3,7 +3,7 @@
 // Background Sync Engine - Specification Compliant
 // Handles automatic and manual sync with conflict resolution
 
-import { offlineDB, SyncQueueItem, AuditTrail } from './offline-first-db'
+import { offlineDB, SyncQueueItem, AuditTrail, ProjectMetadata, Form, Settings } from './offline-first-db'
 
 export type SyncMode = 'automatic' | 'manual'
 export type ConflictStrategy = 'server_wins' | 'client_wins' | 'manual_merge'
@@ -236,7 +236,7 @@ class SyncEngine {
         // Update local forms (server wins)
         for (const form of forms.data || []) {
           // Check if we have a newer version locally
-          const localForm = await offlineDB.getById('forms', form.id)
+          const localForm = await offlineDB.getById<Form>('forms', form.id)
           if (!localForm || form.version > localForm.version) {
             await offlineDB.create('forms', form)
           }
@@ -248,7 +248,7 @@ class SyncEngine {
       if (projectsResponse.ok) {
         const projects = await projectsResponse.json()
         for (const project of projects.data || []) {
-          const localProject = await offlineDB.getById('project_metadata', project.id)
+          const localProject = await offlineDB.getById<ProjectMetadata>('project_metadata', project.id)
           if (!localProject || project.version > localProject.version) {
             await offlineDB.create('project_metadata', project)
           }
@@ -518,7 +518,7 @@ class SyncEngine {
       offlineDB.getAll<SyncQueueItem>('sync_queue', { index: 'syncStatus', value: 'error' })
     ])
 
-    const conflicts = await offlineDB.getAll('settings', { 
+    const conflicts = await offlineDB.getAll<Settings>('settings', { 
       index: 'category', 
       value: 'system' 
     })
