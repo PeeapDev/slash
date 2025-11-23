@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { SampleTypeService } from '@/lib/sample-services'
 
+// OFFLINE-FIRST: This API route is for future cloud sync integration
+// For now, all sample type operations are handled via IndexedDB in the component
 export async function GET() {
   try {
-    const sampleTypes = await SampleTypeService.getAllSampleTypes()
-    
+    // Return empty array - client uses IndexedDB directly
     return NextResponse.json({ 
       success: true, 
-      data: sampleTypes,
-      count: sampleTypes.length
+      data: [],
+      count: 0,
+      message: 'Using IndexedDB - no cloud sync configured'
     })
   } catch (error) {
     console.error('Error fetching sample types:', error)
@@ -22,42 +23,12 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const {
-      typeCode,
-      displayName,
-      description,
-      formSchema,
-      createdBy
-    } = body
-
-    // Validate required fields
-    if (!typeCode || !displayName || !formSchema || !createdBy) {
-      return NextResponse.json(
-        { success: false, error: 'Missing required fields' },
-        { status: 400 }
-      )
-    }
-
-    // Validate type code format (should be uppercase, letters only)
-    if (!/^[A-Z_]+$/.test(typeCode)) {
-      return NextResponse.json(
-        { success: false, error: 'Type code must contain only uppercase letters and underscores' },
-        { status: 400 }
-      )
-    }
-
-    const sampleType = await SampleTypeService.createSampleType({
-      typeCode,
-      displayName,
-      description,
-      formSchema,
-      createdBy
-    })
-
+    
+    // OFFLINE-FIRST: All operations handled via IndexedDB in component
+    // This route will be used for cloud sync when configured
     return NextResponse.json({ 
       success: true, 
-      data: sampleType,
-      message: 'Sample type created successfully'
+      message: 'Using IndexedDB - operation handled client-side'
     })
   } catch (error) {
     console.error('Error creating sample type:', error)
