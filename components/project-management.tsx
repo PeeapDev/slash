@@ -9,6 +9,7 @@ import { offlineDB, ProjectMetadata } from "@/lib/offline-first-db"
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
 
 export default function ProjectManagement() {
+  console.log('🚀 ProjectManagement component loaded - v2 (Pure IndexedDB)')
   const [projects, setProjects] = useState([])
   const [regions, setRegions] = useState([])
   const [showForm, setShowForm] = useState(false)
@@ -79,6 +80,7 @@ export default function ProjectManagement() {
         milestones: [],
         samplingQuotas: [],
         activeModules: ['households', 'participants', 'samples'],
+        status: formData.status || 'not_started', // Add status field for UI
         configurations: { 
           sampleTypes: formData.type === 'blood_sample' ? ['BLOOD'] : 
                       formData.type === 'urine_sample' ? ['URINE'] : 
@@ -229,10 +231,10 @@ export default function ProjectManagement() {
                     <td className="py-4 px-6">
                       <span
                         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                          statusColors[project.status].bg
-                        } ${statusColors[project.status].text}`}
+                          statusColors[project.status || 'not_started']?.bg || 'bg-gray-100'
+                        } ${statusColors[project.status || 'not_started']?.text || 'text-gray-800'}`}
                       >
-                        {statusColors[project.status].label}
+                        {statusColors[project.status || 'not_started']?.label || 'Unknown'}
                       </span>
                     </td>
                     <td className="py-4 px-6">
