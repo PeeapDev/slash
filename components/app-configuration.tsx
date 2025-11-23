@@ -12,6 +12,7 @@ import DatabaseSetup from "@/components/database-setup"
 import DualDatabaseDemo from "@/components/dual-database-demo"
 import PWAStatus from "@/components/pwa-status"
 import SampleTypeConfiguration from "@/components/sample-type-configuration"
+import SyncStatus from "@/components/sync-status"
 
 // Type definitions for roles
 interface Role {
@@ -130,11 +131,23 @@ export default function AppConfiguration() {
         </button>
         <button
           onClick={() => setActiveTab("pwa")}
-          className={`px-4 py-2 border-b-2 transition-colors font-medium ${
-            activeTab === "pwa" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === "pwa"
+              ? "bg-primary text-primary-foreground"
+              : "hover:bg-muted text-foreground"
           }`}
         >
-          PWA Status
+          PWA Settings
+        </button>
+        <button
+          onClick={() => setActiveTab("sync")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === "sync"
+              ? "bg-primary text-primary-foreground"
+              : "hover:bg-muted text-foreground"
+          }`}
+        >
+          Sync Queue
         </button>
       </div>
 
@@ -362,6 +375,19 @@ export default function AppConfiguration() {
               Monitor Progressive Web App status, offline data storage, and synchronization.
             </p>
             <PWAStatus />
+          </div>
+        </div>
+      )}
+
+      {/* Sync Queue Tab */}
+      {activeTab === "sync" && (
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Data Synchronization Queue</h2>
+            <p className="text-muted-foreground">
+              Monitor the IndexedDB sync queue, view pending items, and manage data synchronization to cloud services.
+            </p>
+            <SyncStatus />
           </div>
         </div>
       )}

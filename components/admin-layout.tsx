@@ -26,6 +26,7 @@ import SampleManagementDashboard from "@/components/sample-management-dashboard"
 import FormBuilder from "@/components/form-builder"
 import UnifiedDashboard from "@/components/unified-dashboard"
 import NetworkStatus from "@/components/network-status"
+import SyncStatus from "@/components/sync-status"
 
 interface AdminLayoutProps {
   user: any
@@ -141,6 +142,7 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
           </div>
 
           <div className="flex items-center gap-4">
+            <SyncStatus compact />
             <NetworkStatus />
             <ThemeToggle />
             <button className="p-2 hover:bg-muted rounded-lg">
