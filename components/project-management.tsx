@@ -282,7 +282,7 @@ export default function ProjectManagement() {
           projectTypes={projectTypes}
           onSave={(data) => {
             if (editingProject) {
-              handleUpdateProject(editingProject.id, data)
+              handleEditProject(editingProject.id, data)
             } else {
               handleAddProject(data)
             }
