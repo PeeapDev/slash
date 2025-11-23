@@ -285,6 +285,41 @@ export interface Settings extends BaseRecord {
   projectId?: string
 }
 
+// Lab Result Interface
+export interface LabResult extends BaseRecord {
+  sampleId: string
+  participantId: string
+  householdId: string
+  sampleType: string
+  resultData: any
+  results: { [key: string]: any }
+  status: 'draft' | 'completed' | 'needs_review' | 'reviewed' | 'flagged'
+  reviewStatus?: 'pending' | 'approved' | 'rejected'
+  reviewNotes?: string
+  reviewedBy?: string
+  reviewedAt?: string
+  flaggedReason?: string
+  technicianId: string
+  labId?: string
+}
+
+// Team Member Interface (imported from team-roles)
+export interface TeamMemberDB extends BaseRecord {
+  userId: string
+  email: string
+  fullName: string
+  role: string
+  regionId?: string
+  districtId?: string
+  teamId?: string
+  supervisorId?: string
+  isActive: boolean
+  employmentStatus: string
+  hireDate: string
+  lastActiveAt?: string
+  permissions: any
+}
+
 // IndexedDB Schema Definition
 export interface OfflineDBSchema {
   households: Household[]
@@ -292,6 +327,8 @@ export interface OfflineDBSchema {
   surveys: Survey[]
   samples: Sample[]
   sample_types: SampleType[]
+  lab_results: LabResult[]
+  team_members: TeamMemberDB[]
   forms: Form[]
   form_responses: FormResponse[]
   project_metadata: ProjectMetadata[]
@@ -303,7 +340,7 @@ export interface OfflineDBSchema {
 // Offline-First Database Service
 class OfflineFirstDB {
   private dbName = 'SLASH_FIELDWORK_DB'
-  private dbVersion = 4 // Increased for sample_types store
+  private dbVersion = 5 // Increased for lab_results and team_members stores
   private db: IDBDatabase | null = null
   private deviceId: string
   private collectorId: string
@@ -340,7 +377,8 @@ class OfflineFirstDB {
         const storeNames = [
           'households', 'participants', 'surveys', 'samples',
           'forms', 'form_responses', 'project_metadata',
-          'sample_types', 'sync_queue', 'audit_trails', 'settings'
+          'sample_types', 'lab_results', 'team_members',
+          'sync_queue', 'audit_trails', 'settings'
         ]
 
         storeNames.forEach(storeName => {
@@ -372,6 +410,19 @@ class OfflineFirstDB {
               store.createIndex('objectStore', 'objectStore')
               store.createIndex('operation', 'operation')
               store.createIndex('userId', 'userId')
+            } else if (storeName === 'lab_results') {
+              store.createIndex('sampleId', 'sampleId')
+              store.createIndex('participantId', 'participantId')
+              store.createIndex('status', 'status')
+              store.createIndex('reviewStatus', 'reviewStatus')
+              store.createIndex('technicianId', 'technicianId')
+            } else if (storeName === 'team_members') {
+              store.createIndex('userId', 'userId')
+              store.createIndex('email', 'email')
+              store.createIndex('role', 'role')
+              store.createIndex('isActive', 'isActive')
+              store.createIndex('regionId', 'regionId')
+              store.createIndex('districtId', 'districtId')
             }
           }
         })

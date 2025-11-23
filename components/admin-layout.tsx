@@ -30,6 +30,8 @@ import SyncStatus from "@/components/sync-status"
 import SampleTypeConfiguration from "@/components/sample-type-configuration"
 import LabDashboard from "@/components/lab-dashboard"
 import LabResultsEntryForm from "@/components/lab-results-entry-form"
+import LabReviewAnalytics from "@/components/lab-review-analytics"
+import TeamManagement from "@/components/team-management"
 
 interface AdminLayoutProps {
   user: any
@@ -68,12 +70,14 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
     { id: "sample-types", label: "Sample Types", icon: "🔬", section: "Laboratory" },
     { id: "lab-queue", label: "Lab Queue", icon: "📋", section: "Laboratory" },
     { id: "lab-results", label: "Lab Results", icon: "📊", section: "Laboratory" },
+    { id: "lab-review", label: "Lab Review", icon: "👁️", section: "Laboratory" },
     
     // Administration
     { id: "projects", label: "Projects", icon: "📋", section: "Administration" },
     { id: "regions", label: "Regions", icon: "🗺️", section: "Administration" },
     { id: "districts", label: "Districts", icon: "📍", section: "Administration" },
-    { id: "hr", label: "HR Management", icon: "👥", section: "Administration" },
+    { id: "team", label: "Team Management", icon: "👥", section: "Administration" },
+    { id: "hr", label: "HR Management", icon: "💼", section: "Administration" },
     
     // System
     { id: "sync", label: "Sync & Offline", icon: "📡", section: "System" },
@@ -103,10 +107,14 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
         return <LabDashboard />
       case "lab-results":
         return <LabResultsEntryForm />
+      case "lab-review":
+        return <LabReviewAnalytics />
       case "regions":
         return <RegionalManagement />
       case "districts":
         return <DistrictManagement />
+      case "team":
+        return <TeamManagement />
       case "hr":
         return <HRManagement />
       case "sync":
