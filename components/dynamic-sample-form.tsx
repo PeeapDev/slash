@@ -86,19 +86,39 @@ export default function DynamicSampleForm({
 
   const loadSampleTypes = async () => {
     try {
-      // PURE INDEXEDDB MODE - Use predefined sample types (offline-first)
-      console.log('🧪 Loading sample types from local config (IndexedDB mode)')
-      const sampleTypes = [
-        { id: 'BLOOD', name: 'Blood Sample', code: 'BLOOD' },
-        { id: 'URINE', name: 'Urine Sample', code: 'URINE' },
-        { id: 'SALIVA', name: 'Saliva Sample', code: 'SALIVA' },
-        { id: 'SWAB', name: 'Swab Sample', code: 'SWAB' }
-      ]
-      setSampleTypes(sampleTypes)
-      console.log(`✅ Loaded ${sampleTypes.length} sample types from local config`)
+      // PURE INDEXEDDB MODE - Load sample types from IndexedDB
+      console.log('🧪 Loading sample types from IndexedDB...')
+      
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localTypes = await offlineDB.getAll('sample_types')
+      console.log(`✅ Loaded ${localTypes.length} sample types from IndexedDB`)
+
+      // Format for form compatibility
+      const formattedTypes = localTypes.map((type: any) => ({
+        id: type.id,
+        type_code: type.code,
+        display_name: type.name,
+        description: type.description,
+        form_schema: {
+          fields: type.fields || []
+        }
+      }))
+      
+      setSampleTypes(formattedTypes)
     } catch (error) {
       console.error('Error loading sample types:', error)
-      setSampleTypes([])
+      // Fallback to basic types if IndexedDB fails
+      setSampleTypes([
+        { 
+          id: 'BLOOD', 
+          type_code: 'BLOOD', 
+          display_name: 'Blood Sample', 
+          description: 'Basic blood collection',
+          form_schema: { fields: [] }
+        }
+      ])
     }
   }
 
