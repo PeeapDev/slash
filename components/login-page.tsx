@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 interface User {
   id: string
@@ -46,8 +47,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8 shadow-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-        <div className="text-center mb-8">
+      <Card className="w-full max-w-md p-8 shadow-lg bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 relative">
+        {/* Theme Toggle - Top Right */}
+        <div className="absolute top-4 right-4">
+          <ThemeToggle />
+        </div>
+        
+        <div className="text-center mb-8 pt-8">
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white mb-2">SLASH Tool</h1>
           <p className="text-slate-600 dark:text-slate-300">Household & Lab Data Capture</p>
         </div>
