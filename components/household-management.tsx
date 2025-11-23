@@ -80,9 +80,8 @@ export default function HouseholdManagement() {
   useEffect(() => {
     loadHouseholds()
     loadProjects()
+    loadCurrentUser()
     setRegions(SIERRA_LEONE_REGIONS)
-    const user = JSON.parse(localStorage.getItem("current_user") || '{"role":"superadmin"}')
-    setUserRole(user.role)
   }, [])
 
   // INDEXEDDB-FIRST: Load households from IndexedDB
@@ -122,6 +121,50 @@ export default function HouseholdManagement() {
     } catch (error) {
       console.error('❌ Error loading projects from IndexedDB:', error)
       setProjects([])
+    }
+  }
+
+  // INDEXEDDB-FIRST: Load current user from IndexedDB
+  const loadCurrentUser = async () => {
+    try {
+      console.log('👤 Loading current user from IndexedDB...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      // Try to get user from settings store
+      const userSettings = await offlineDB.getAll('settings')
+      const currentUserSetting = userSettings.find(s => s.key === 'current_user')
+      
+      if (currentUserSetting && currentUserSetting.value) {
+        setUserRole(currentUserSetting.value.role || 'superadmin')
+        console.log(`✅ Loaded user role: ${currentUserSetting.value.role}`)
+      } else {
+        // Default to superadmin if no user found
+        setUserRole('superadmin')
+        console.log('ℹ️ No current user found in IndexedDB - defaulting to superadmin')
+        
+        // Optionally create default user in IndexedDB
+        const defaultUser = {
+          id: 'current_user',
+          key: 'current_user',
+          value: { 
+            role: 'superadmin', 
+            email: 'admin@localhost',
+            id: 'user_admin'
+          },
+          category: 'auth',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'local' as const,
+          version: 1
+        }
+        
+        await offlineDB.create('settings', defaultUser)
+        console.log('✅ Created default superadmin user in IndexedDB')
+      }
+    } catch (error) {
+      console.error('❌ Error loading current user from IndexedDB:', error)
+      setUserRole('superadmin') // Fallback
     }
   }
 

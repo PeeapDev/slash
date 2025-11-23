@@ -43,9 +43,8 @@ export default function ProjectManagement() {
 
   useEffect(() => {
     loadProjects()
+    loadCurrentUser()
     setRegions(SIERRA_LEONE_REGIONS)
-    const user = JSON.parse(localStorage.getItem("current_user") || '{"role":"superadmin"}')
-    setUserRole(user.role)
   }, [])
 
   // Load projects from IndexedDB (offline-first)
@@ -77,6 +76,49 @@ export default function ProjectManagement() {
     { value: "urine_sample", label: "Urine Sample Collection" },
     { value: "other", label: "Other" },
   ]
+
+  // INDEXEDDB-FIRST: Load current user from IndexedDB
+  const loadCurrentUser = async () => {
+    try {
+      console.log('👤 Loading current user from IndexedDB...')
+      await offlineDB.init()
+      
+      // Try to get user from settings store
+      const userSettings = await offlineDB.getAll('settings')
+      const currentUserSetting = userSettings.find(s => s.key === 'current_user')
+      
+      if (currentUserSetting && currentUserSetting.value) {
+        setUserRole(currentUserSetting.value.role || 'superadmin')
+        console.log(`✅ Loaded user role: ${currentUserSetting.value.role}`)
+      } else {
+        // Default to superadmin if no user found
+        setUserRole('superadmin')
+        console.log('ℹ️ No current user found in IndexedDB - defaulting to superadmin')
+        
+        // Create default user in IndexedDB
+        const defaultUser = {
+          id: 'current_user',
+          key: 'current_user',
+          value: { 
+            role: 'superadmin', 
+            email: 'admin@localhost',
+            id: 'user_admin'
+          },
+          category: 'auth',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          syncStatus: 'local' as const,
+          version: 1
+        }
+        
+        await offlineDB.create('settings', defaultUser)
+        console.log('✅ Created default superadmin user in IndexedDB')
+      }
+    } catch (error) {
+      console.error('❌ Error loading current user from IndexedDB:', error)
+      setUserRole('superadmin') // Fallback
+    }
+  }
 
   const statusColors: Record<string, { bg: string; text: string; label: string }> = {
     not_started: { bg: "bg-red-100", text: "text-red-800", label: "Not Started" },
