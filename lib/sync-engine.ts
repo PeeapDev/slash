@@ -224,38 +224,11 @@ class SyncEngine {
     }
   }
 
-  // Pull Global Updates (Server Wins)
+  // Pull Global Updates (Server Wins) - DISABLED FOR PURE INDEXEDDB MODE
   private async pullGlobalUpdates(): Promise<void> {
     try {
-      console.log('📥 Pulling global updates...')
-
-      // Pull form definitions
-      const formsResponse = await fetch('/api/forms')
-      if (formsResponse.ok) {
-        const forms = await formsResponse.json()
-        // Update local forms (server wins)
-        for (const form of forms.data || []) {
-          // Check if we have a newer version locally
-          const localForm = await offlineDB.getById<Form>('forms', form.id)
-          if (!localForm || form.version > localForm.version) {
-            await offlineDB.create('forms', form)
-          }
-        }
-      }
-
-      // Pull project metadata
-      const projectsResponse = await fetch('/api/projects')
-      if (projectsResponse.ok) {
-        const projects = await projectsResponse.json()
-        for (const project of projects.data || []) {
-          const localProject = await offlineDB.getById<ProjectMetadata>('project_metadata', project.id)
-          if (!localProject || project.version > localProject.version) {
-            await offlineDB.create('project_metadata', project)
-          }
-        }
-      }
-
-      console.log('✅ Global updates pulled successfully')
+      console.log('📥 PURE INDEXEDDB MODE - Skipping external API calls...')
+      console.log('✅ Global updates skipped - pure IndexedDB mode')
     } catch (error) {
       console.error('❌ Failed to pull global updates:', error)
       throw error

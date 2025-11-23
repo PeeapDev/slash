@@ -98,17 +98,26 @@ export default function DynamicSampleForm({
 
   const loadProjects = async () => {
     try {
-      const response = await fetch('/api/projects')
-      const data = await response.json()
-      console.log('Projects API response:', data)
-      if (data.success) {
-        setProjects(data.data)
-        console.log('Loaded projects:', data.data)
-      } else {
-        console.error('Projects API error:', data.error)
-      }
+      // PURE INDEXEDDB MODE - Load projects from local storage
+      console.log('📊 Loading projects from IndexedDB for sample form...')
+      const { offlineDB } = await import('@/lib/offline-first-db')
+      await offlineDB.init()
+      
+      const localProjects = await offlineDB.getAll('project_metadata')
+      console.log(`✅ Loaded ${localProjects.length} projects from IndexedDB for sample form`)
+      
+      // Convert to the format expected by the component
+      const formattedProjects = localProjects.map((project: any) => ({
+        id: project.id,
+        project_name: project.projectName,
+        project_code: project.projectCode,
+        expected_sample_types: project.configurations?.sampleTypes || []
+      }))
+      
+      setProjects(formattedProjects)
     } catch (error) {
-      console.error('Error loading projects:', error)
+      console.error('❌ Error loading projects from IndexedDB:', error)
+      setProjects([])
     }
   }
 
