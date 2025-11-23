@@ -22,6 +22,7 @@ import HouseholdManagement from "@/components/household-management"
 import ParticipantManagement from "@/components/participant-management"
 import SurveyManagement from "@/components/survey-management"
 import SampleManagement from "@/components/sample-management"
+import SampleManagementDashboard from "@/components/sample-management-dashboard"
 import FormBuilder from "@/components/form-builder"
 import UnifiedDashboard from "@/components/unified-dashboard"
 
@@ -67,7 +68,7 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
       case "surveys":
         return <SurveyManagement />
       case "samples":
-        return <SampleManagement />
+        return <SampleManagementDashboard />
       case "regions":
         return <RegionalManagement />
       case "districts":

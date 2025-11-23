@@ -9,6 +9,7 @@ import AICredentials from "@/components/ai-credentials"
 import AISettings from "@/components/ai-settings"
 import SystemLogs from "@/components/system-logs"
 import DatabaseSetup from "@/components/database-setup"
+import DualDatabaseDemo from "@/components/dual-database-demo"
 
 // Type definitions for roles
 interface Role {
@@ -316,6 +317,7 @@ export default function AppConfiguration() {
               Manage database connections, initialize tables, and monitor database health.
             </p>
             <DatabaseSetup />
+            <DualDatabaseDemo />
           </div>
         </div>
       )}

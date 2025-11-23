@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { initializeDatabase, checkDatabaseHealth } from '@/lib/database'
+import { SampleDatabaseService } from '@/lib/sample-database'
 
 export async function GET() {
   try {
@@ -22,13 +23,16 @@ export async function GET() {
 
 export async function POST() {
   try {
-    // Initialize database tables
+    // Initialize core database tables
     const initialized = await initializeDatabase()
     
     if (initialized) {
+      // Initialize sample management tables
+      await SampleDatabaseService.createSampleTables()
+      
       return NextResponse.json({ 
         success: true, 
-        message: 'Database initialized successfully' 
+        message: 'Database initialized successfully with sample management tables' 
       })
     } else {
       return NextResponse.json(
