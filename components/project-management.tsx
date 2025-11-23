@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Plus, Edit2, Trash2 } from "lucide-react"
 import { offlineDB, ProjectMetadata } from "@/lib/offline-first-db"
-import { syncEngine } from "@/lib/sync-engine"
+// Sync engine disabled for pure IndexedDB testing
 import { SIERRA_LEONE_REGIONS } from "@/lib/sierra-leone-regions"
 
 export default function ProjectManagement() {
@@ -36,20 +36,8 @@ export default function ProjectManagement() {
       
       setProjects(localProjects as any)
       
-      // If online, also try to fetch from API to sync any server updates
-      if (navigator.onLine) {
-        try {
-          const response = await fetch('/api/projects')
-          const data = await response.json()
-          if (data.success && data.data.length > 0) {
-            console.log(`🔄 Found ${data.data.length} projects in Neon, syncing...`)
-            // Server data available, but we stick to offline-first principle
-            // Sync engine will handle the proper merging
-          }
-        } catch (error) {
-          console.log('📴 API unavailable, continuing with offline data')
-        }
-      }
+      // PURE INDEXEDDB MODE - No external API calls
+      console.log('🎯 Pure IndexedDB mode - no external database sync')
     } catch (error) {
       console.error('❌ Error loading projects from IndexedDB:', error)
       setProjects([])
@@ -98,17 +86,10 @@ export default function ProjectManagement() {
         }
       }
 
-      // Save to IndexedDB first
+      // Save to IndexedDB - PURE OFFLINE MODE
       await offlineDB.create<ProjectMetadata>('project_metadata', projectData)
-      console.log('✅ Project saved to IndexedDB')
-      
-      // Trigger sync to Neon database
-      if (navigator.onLine) {
-        console.log('🔄 Triggering sync to Neon...')
-        await syncEngine.syncNow()
-      } else {
-        console.log('📴 Offline - project queued for sync when online')
-      }
+      console.log('✅ Project saved to IndexedDB - PURE OFFLINE MODE')
+      console.log('📊 Project data:', projectData)
       
       // Refresh local list
       await loadProjects()
