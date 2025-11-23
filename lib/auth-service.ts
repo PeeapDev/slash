@@ -1,5 +1,3 @@
-"use client"
-
 import { supabase } from './database'
 import { UserService, LogService } from './database-services'
 import bcrypt from 'bcryptjs'

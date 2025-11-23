@@ -1,9 +1,11 @@
-// Data stores with database integration
-import { HouseholdService, ParticipantService, SampleService } from './database-services'
+"use client"
 
-// Check if we're in browser environment and database is available
+// Data stores with database integration (client-side safe)
+// Database operations should be done through API calls
+
+// Check if we're in browser environment
 const isClient = typeof window !== 'undefined'
-const isDatabaseEnabled = process.env.DATABASE_URL || process.env.NEXT_PUBLIC_DATABASE_ENABLED
+const isDatabaseEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED
 
 export interface HouseholdData {
   id: string

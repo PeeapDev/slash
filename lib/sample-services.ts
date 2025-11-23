@@ -1,5 +1,3 @@
-"use client"
-
 import { query } from './database'
 import { LogService } from './database-services'
 import { SampleDatabaseService } from './sample-database'

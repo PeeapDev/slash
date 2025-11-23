@@ -1,5 +1,3 @@
-"use client"
-
 import { query } from './database'
 
 // User Management Service

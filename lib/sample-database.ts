@@ -1,5 +1,3 @@
-"use client"
-
 import { query } from './database'
 
 // Sample management database schema and operations
