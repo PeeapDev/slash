@@ -222,43 +222,50 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Key Analytics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-        <Card className="p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
-          <div className="text-sm text-blue-700 dark:text-blue-300 font-medium">Total Households</div>
-          <div className="text-3xl font-bold mt-2 text-blue-900 dark:text-blue-100">{(households || []).length.toLocaleString()}</div>
-          <div className="text-xs text-blue-600 dark:text-blue-400 mt-2 flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-            {(households || []).filter(h => h.syncStatus === 'synced').length} synced
+      {/* Key Analytics - 2 columns on mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 lg:gap-4">
+        <Card className="p-3 lg:p-6 bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border-blue-200 dark:border-blue-800">
+          <div className="text-xs lg:text-sm text-blue-700 dark:text-blue-300 font-medium">Households</div>
+          <div className="text-xl lg:text-3xl font-bold mt-1 lg:mt-2 text-blue-900 dark:text-blue-100">{(households || []).length.toLocaleString()}</div>
+          <div className="text-[10px] lg:text-xs text-blue-600 dark:text-blue-400 mt-1 lg:mt-2 flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-green-500"></span>
+            <span className="hidden lg:inline">{(households || []).filter(h => h.syncStatus === 'synced').length} synced</span>
+            <span className="lg:hidden">{(households || []).filter(h => h.syncStatus === 'synced').length}</span>
           </div>
         </Card>
-        <Card className="p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
-          <div className="text-sm text-green-700 dark:text-green-300 font-medium">Total Participants</div>
-          <div className="text-3xl font-bold mt-2 text-green-900 dark:text-green-100">{(participants || []).length.toLocaleString()}</div>
-          <div className="text-xs text-green-600 dark:text-green-400 mt-2 flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-            {(participants || []).filter(p => p.syncStatus === 'synced').length} synced
+        <Card className="p-3 lg:p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
+          <div className="text-xs lg:text-sm text-green-700 dark:text-green-300 font-medium">Participants</div>
+          <div className="text-xl lg:text-3xl font-bold mt-1 lg:mt-2 text-green-900 dark:text-green-100">{(participants || []).length.toLocaleString()}</div>
+          <div className="text-[10px] lg:text-xs text-green-600 dark:text-green-400 mt-1 lg:mt-2 flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-green-500"></span>
+            <span className="hidden lg:inline">{(participants || []).filter(p => p.syncStatus === 'synced').length} synced</span>
+            <span className="lg:hidden">{(participants || []).filter(p => p.syncStatus === 'synced').length}</span>
           </div>
         </Card>
-        <Card className="p-6 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800">
-          <div className="text-sm text-amber-700 dark:text-amber-300 font-medium">Samples Collected</div>
-          <div className="text-3xl font-bold mt-2 text-amber-900 dark:text-amber-100">{(samples || []).length.toLocaleString()}</div>
-          <div className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-            {(samples || []).filter(s => s.syncStatus === 'synced').length} synced
+        <Card className="p-3 lg:p-6 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800">
+          <div className="text-xs lg:text-sm text-amber-700 dark:text-amber-300 font-medium">Samples</div>
+          <div className="text-xl lg:text-3xl font-bold mt-1 lg:mt-2 text-amber-900 dark:text-amber-100">{(samples || []).length.toLocaleString()}</div>
+          <div className="text-[10px] lg:text-xs text-amber-600 dark:text-amber-400 mt-1 lg:mt-2 flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 lg:w-2 lg:h-2 rounded-full bg-green-500"></span>
+            <span className="hidden lg:inline">{(samples || []).filter(s => s.syncStatus === 'synced').length} synced</span>
+            <span className="lg:hidden">{(samples || []).filter(s => s.syncStatus === 'synced').length}</span>
           </div>
         </Card>
-        <Card className="p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
-          <div className="text-sm text-purple-700 dark:text-purple-300 font-medium">Lab Results</div>
-          <div className="text-3xl font-bold mt-2 text-purple-900 dark:text-purple-100">{(labResults || []).length.toLocaleString()}</div>
-          <div className="text-xs text-purple-600 dark:text-purple-400 mt-2">
-            {(samples || []).length > 0 ? Math.round(((labResults || []).length / (samples || []).length) * 100) : 0}% completion rate
+        <Card className="p-3 lg:p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
+          <div className="text-xs lg:text-sm text-purple-700 dark:text-purple-300 font-medium">Lab Results</div>
+          <div className="text-xl lg:text-3xl font-bold mt-1 lg:mt-2 text-purple-900 dark:text-purple-100">{(labResults || []).length.toLocaleString()}</div>
+          <div className="text-[10px] lg:text-xs text-purple-600 dark:text-purple-400 mt-1 lg:mt-2">
+            <span className="hidden lg:inline">{(samples || []).length > 0 ? Math.round(((labResults || []).length / (samples || []).length) * 100) : 0}% rate</span>
+            <span className="lg:hidden">{(samples || []).length > 0 ? Math.round(((labResults || []).length / (samples || []).length) * 100) : 0}%</span>
           </div>
         </Card>
-        <Card className="p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 border-indigo-200 dark:border-indigo-800">
-          <div className="text-sm text-indigo-700 dark:text-indigo-300 font-medium">Active Projects</div>
-          <div className="text-3xl font-bold mt-2 text-indigo-900 dark:text-indigo-100">{(projects || []).length}</div>
-          <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">{(projects || []).length} total projects</div>
+        <Card className="p-3 lg:p-6 bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-950 dark:to-indigo-900 border-indigo-200 dark:border-indigo-800">
+          <div className="text-xs lg:text-sm text-indigo-700 dark:text-indigo-300 font-medium">Projects</div>
+          <div className="text-xl lg:text-3xl font-bold mt-1 lg:mt-2 text-indigo-900 dark:text-indigo-100">{(projects || []).length}</div>
+          <div className="text-[10px] lg:text-xs text-indigo-600 dark:text-indigo-400 mt-1 lg:mt-2">
+            <span className="hidden lg:inline">{(projects || []).length} total</span>
+            <span className="lg:hidden">Active</span>
+          </div>
         </Card>
       </div>
 
