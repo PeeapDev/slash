@@ -32,6 +32,15 @@ interface ParticipantFormData {
   education?: string
 }
 
+// Helper to format household display in dropdown
+const formatHouseholdDisplay = (h: any) => {
+  const name = h.headOfHousehold || h.headName || 'Unknown'
+  const address = h.address || 'No address'
+  const district = h.district || address.split(',').pop()?.trim() || 'Unknown'
+  const id = h.householdId || h.id
+  return `${name} - ${address} in ${district} - ${id}`
+}
+
 export default function ParticipantManagement() {
   const [participants, setParticipants] = useState<Participant[]>([])
   const [households, setHouseholds] = useState<Household[]>([])
@@ -182,8 +191,10 @@ export default function ParticipantManagement() {
 
   // Helper to get household name by ID
   const getHouseholdName = (householdId: string) => {
-    const household = households.find(h => h.id === householdId)
-    return household ? household.headOfHousehold : householdId
+    const household = households.find(h => h.id === householdId) as any
+    if (!household) return householdId
+    // Handle both database schema (headOfHousehold) and component interface (headName)
+    return household.headOfHousehold || household.headName || householdId
   }
 
   return (
@@ -212,7 +223,7 @@ export default function ParticipantManagement() {
             <option value="all">All Households</option>
             {households.map((h: Household) => (
               <option key={h.id} value={h.id}>
-                {h.householdId} - {h.headOfHousehold}
+                {formatHouseholdDisplay(h)}
               </option>
             ))}
           </select>
@@ -361,7 +372,7 @@ function ParticipantFormModal({ participant, households, onSave, onClose }: Part
             const householdParticipants = allParticipants.filter((p: Participant) => p.householdId === formData.householdId)
             
             setParticipantCount({
-              expected: household.familySize || 0,
+              expected: (household as any).familySize || (household as any).totalMembers || 0,
               registered: householdParticipants.length
             })
           }
@@ -396,7 +407,7 @@ function ParticipantFormModal({ participant, households, onSave, onClose }: Part
               <option value="">Select Household</option>
               {households.map((h: Household) => (
                 <option key={h.id} value={h.id}>
-                  {h.householdId} - {h.headOfHousehold}
+                  {formatHouseholdDisplay(h)}
                 </option>
               ))}
             </select>
@@ -405,7 +416,7 @@ function ParticipantFormModal({ participant, households, onSave, onClose }: Part
             {selectedHousehold && (
               <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
                 <div className="text-sm font-medium text-blue-800 mb-2">
-                  📊 Household: {selectedHousehold.headOfHousehold}
+                  📊 Household: {(selectedHousehold as any).headOfHousehold || (selectedHousehold as any).headName}
                 </div>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
@@ -417,17 +428,27 @@ function ParticipantFormModal({ participant, households, onSave, onClose }: Part
                     <div className="text-xs text-green-600">Registered</div>
                   </div>
                   <div>
-                    <div className={`text-lg font-bold ${participantCount.expected - participantCount.registered > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                      {participantCount.expected - participantCount.registered}
+                    <div className={`text-lg font-bold ${participantCount.registered >= participantCount.expected ? 'text-green-600' : 'text-orange-600'}`}>
+                      {Math.max(0, participantCount.expected - participantCount.registered)}
                     </div>
-                    <div className={`text-xs ${participantCount.expected - participantCount.registered > 0 ? 'text-orange-600' : 'text-green-600'}`}>
-                      {participantCount.expected - participantCount.registered > 0 ? 'Missing' : 'Complete'}
+                    <div className={`text-xs ${participantCount.registered >= participantCount.expected ? 'text-green-600' : 'text-orange-600'}`}>
+                      {participantCount.registered >= participantCount.expected ? 'Complete' : 'Remaining'}
                     </div>
                   </div>
                 </div>
-                {participantCount.expected - participantCount.registered > 0 && (
+                {participantCount.registered < participantCount.expected && (
                   <div className="mt-2 text-xs text-orange-700">
                     ⚠️ This household still needs {participantCount.expected - participantCount.registered} more participant(s)
+                  </div>
+                )}
+                {participantCount.registered >= participantCount.expected && participantCount.expected > 0 && (
+                  <div className="mt-2 text-xs text-green-700">
+                    ✅ All expected participants registered!
+                  </div>
+                )}
+                {participantCount.expected === 0 && (
+                  <div className="mt-2 text-xs text-red-700">
+                    ⚠️ Warning: This household has no expected participant count set. Please update the household record.
                   </div>
                 )}
               </div>
