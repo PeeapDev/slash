@@ -175,6 +175,28 @@ export interface ValidationError {
   severity: 'error' | 'warning'
 }
 
+export interface SampleType extends BaseRecord {
+  id: string
+  code: string
+  name: string
+  description: string
+  fields: Array<{
+    name: string
+    type: 'text' | 'number' | 'select' | 'textarea' | 'checkbox' | 'date' | 'time'
+    label: string
+    required: boolean
+    options?: string[]
+    placeholder?: string
+    defaultValue?: any
+    validation?: {
+      min?: number
+      max?: number
+      pattern?: string
+    }
+  }>
+  isActive: boolean
+}
+
 export interface ProjectMetadata extends BaseRecord {
   projectId: string
   projectName: string
@@ -317,7 +339,7 @@ class OfflineFirstDB {
         const storeNames = [
           'households', 'participants', 'surveys', 'samples',
           'forms', 'form_responses', 'project_metadata',
-          'sync_queue', 'audit_trails', 'settings'
+          'sample_types', 'sync_queue', 'audit_trails', 'settings'
         ]
 
         storeNames.forEach(storeName => {

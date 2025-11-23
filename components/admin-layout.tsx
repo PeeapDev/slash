@@ -23,7 +23,6 @@ import ParticipantManagement from "@/components/participant-management"
 import SurveyManagement from "@/components/survey-management"
 import SampleManagement from "@/components/sample-management"
 import SampleManagementDashboard from "@/components/sample-management-dashboard"
-import SampleTypeManagement from "@/components/sample-type-management"
 import FormBuilder from "@/components/form-builder"
 import UnifiedDashboard from "@/components/unified-dashboard"
 
@@ -57,7 +56,6 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
     { id: "participants", label: "Participants", icon: "👨" },
     { id: "surveys", label: "Surveys", icon: "📝" },
     { id: "samples", label: "Samples", icon: "🧪" },
-    { id: "sample-types", label: "Sample Types", icon: "🔬" },
     { id: "regions", label: "Regional Management", icon: "🗺️" },
     { id: "districts", label: "District Management", icon: "📍" },
     { id: "hr", label: "HR Management", icon: "👥" },
@@ -82,8 +80,6 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
         return <SurveyManagement />
       case "samples":
         return <SampleManagementDashboard />
-      case "sample-types":
-        return <SampleTypeManagement />
       case "regions":
         return <RegionalManagement />
       case "districts":
