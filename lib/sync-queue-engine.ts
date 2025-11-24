@@ -6,10 +6,30 @@ export class SyncQueueEngine {
   private syncInterval: NodeJS.Timeout | null = null
   private networkCheckInterval: NodeJS.Timeout | null = null
   private isOnline = false
+  private syncListeners: Array<() => void> = []
   
   constructor() {
     this.isOnline = typeof navigator !== 'undefined' ? navigator.onLine : false
     console.log('🔄 SyncQueueEngine initialized')
+  }
+  
+  // Subscribe to sync events
+  onSyncComplete(callback: () => void) {
+    this.syncListeners.push(callback)
+    return () => {
+      this.syncListeners = this.syncListeners.filter(cb => cb !== callback)
+    }
+  }
+  
+  // Notify listeners that sync completed
+  private notifySyncComplete() {
+    this.syncListeners.forEach(callback => {
+      try {
+        callback()
+      } catch (error) {
+        console.error('Error in sync listener:', error)
+      }
+    })
   }
 
   // Start the sync engine
@@ -61,12 +81,20 @@ export class SyncQueueEngine {
     if (typeof window !== 'undefined') {
       window.addEventListener('online', this.handleOnline.bind(this))
       window.addEventListener('offline', this.handleOffline.bind(this))
+      
+      // Also trigger sync when page becomes visible (user returns)
+      document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && this.isOnline) {
+          console.log('👁️ Page visible - triggering sync')
+          this.performSync()
+        }
+      })
     }
 
-    // Periodic network check (every 30 seconds)
+    // More frequent network check (every 10 seconds)
     this.networkCheckInterval = setInterval(async () => {
       await this.checkNetworkConnectivity()
-    }, 30000)
+    }, 10000)
 
     // Initial check
     this.checkNetworkConnectivity()
@@ -75,7 +103,10 @@ export class SyncQueueEngine {
   private handleOnline() {
     console.log('🌐 Network: ONLINE - Starting immediate sync')
     this.isOnline = true
-    this.performSync() // Immediate sync when coming online
+    // Trigger multiple immediate syncs to ensure data is uploaded quickly
+    this.performSync()
+    setTimeout(() => this.performSync(), 1000)
+    setTimeout(() => this.performSync(), 3000)
   }
 
   private handleOffline() {
@@ -103,14 +134,19 @@ export class SyncQueueEngine {
     }
   }
 
-  // Start the sync loop
+  // Start the sync loop - INSTANT SYNC MODE
   private startSyncLoop() {
-    // Sync every 2 minutes when online
+    // Sync every 5 seconds when online for INSTANT sync
     this.syncInterval = setInterval(async () => {
       if (this.isOnline) {
         await this.performSync()
       }
-    }, 120000) // 2 minutes
+    }, 5000) // 5 seconds for instant sync
+    
+    // Immediate first sync
+    if (this.isOnline) {
+      this.performSync()
+    }
   }
 
   // Main sync function
@@ -173,6 +209,11 @@ export class SyncQueueEngine {
       }
 
       console.log(`✅ Sync complete: ${successCount} synced, ${failureCount} failed`)
+      
+      // Notify listeners that sync completed
+      if (successCount > 0) {
+        this.notifySyncComplete()
+      }
 
     } catch (error) {
       console.error('❌ Sync process error:', error)

@@ -221,18 +221,20 @@ export default function AdminLayout({ user, onLogout, currentPage, onPageChange 
 
         {/* Page Content - Mobile Optimized */}
         <div className="flex-1 overflow-auto">
-          {/* Mobile: No padding top, content fills screen */}
-          <div className="p-0 lg:p-6 pb-20 lg:pb-6">{renderPage()}</div>
+          {/* Mobile: padding for content, extra bottom for nav */}
+          <div className="p-4 lg:p-6 pb-20 lg:pb-6">{renderPage()}</div>
         </div>
 
-        {/* Floating Menu Button (Mobile/Tablet Only) */}
-        <button
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="lg:hidden fixed top-4 right-4 z-40 p-4 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all touch-manipulation active:scale-95"
-          aria-label="Open menu"
-        >
-          <Menu size={24} />
-        </button>
+        {/* Floating Menu Button (Mobile/Tablet Only) - Left Side, Hidden When Open */}
+        {!isMobileMenuOpen && (
+          <button
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="lg:hidden fixed top-4 left-4 z-40 p-2 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all touch-manipulation active:scale-95"
+            aria-label="Open menu"
+          >
+            <Menu size={20} />
+          </button>
+        )}
 
         {/* Mobile Bottom Navigation - Field Work Tools */}
         <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t border-border/50 z-30 safe-area-inset-bottom shadow-2xl">

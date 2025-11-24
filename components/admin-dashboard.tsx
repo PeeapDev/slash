@@ -78,12 +78,32 @@ export default function AdminDashboard() {
   useEffect(() => {
     loadData()
     
+    // Subscribe to sync events to auto-reload dashboard
+    let unsubscribe: (() => void) | undefined
+    
+    const setupSyncListener = async () => {
+      try {
+        const { syncEngine } = await import('@/lib/sync-queue-engine')
+        unsubscribe = syncEngine.onSyncComplete(() => {
+          console.log('🔄 Sync completed - reloading dashboard data')
+          loadData()
+        })
+      } catch (error) {
+        console.error('Failed to setup sync listener:', error)
+      }
+    }
+    
+    setupSyncListener()
+    
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       loadData()
     }, 30000)
     
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(interval)
+      if (unsubscribe) unsubscribe()
+    }
   }, [])
 
   // Calculate regional activity from actual data
