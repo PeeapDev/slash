@@ -163,19 +163,68 @@ export class SyncQueueEngine {
       const queueItems = await offlineDB.getAll<SyncQueueItem>('sync_queue')
       const pendingItems = queueItems.filter(item => item.syncStatus === 'pending')
       
+      // 🛡️ AUTOMATIC SAFEGUARD: Detect and fix infinite loop issues
+      if (queueItems.length > 1000) {
+        console.warn(`⚠️ ALERT: ${queueItems.length} items in queue - detecting issues...`)
+        
+        // Auto-clean invalid entries (like sync_queue syncing itself)
+        const invalidStores = ['sync_queue', 'audit_trails', 'settings', 'app_settings']
+        const invalidItems = queueItems.filter(item => invalidStores.includes(item.objectStore))
+        
+        if (invalidItems.length > 0) {
+          console.warn(`🧹 Auto-cleaning ${invalidItems.length} invalid sync queue entries...`)
+          for (const item of invalidItems) {
+            await offlineDB.delete('sync_queue', item.id)
+          }
+          console.log('✅ Invalid entries cleaned automatically!')
+          
+          // Reload queue after cleanup
+          const cleanedQueue = await offlineDB.getAll<SyncQueueItem>('sync_queue')
+          console.log(`📊 Queue size after cleanup: ${cleanedQueue.length}`)
+          return // Skip this sync cycle, next one will process clean queue
+        }
+        
+        // If queue is still huge but no invalid entries, clear old synced items
+        const syncedItems = queueItems.filter(item => item.syncStatus === 'synced')
+        if (syncedItems.length > 500) {
+          console.warn(`🧹 Auto-cleaning ${syncedItems.length} old synced items...`)
+          for (const item of syncedItems) {
+            await offlineDB.delete('sync_queue', item.id)
+          }
+          console.log('✅ Old synced items cleaned!')
+        }
+      }
+      
       if (pendingItems.length === 0) {
         console.log('✅ Sync queue empty - nothing to sync')
         return
       }
 
-      console.log(`🔄 Processing ${pendingItems.length} queued items...`)
+      // 🛡️ SAFEGUARD: Limit batch size to prevent performance issues
+      const MAX_BATCH_SIZE = 50
+      const itemsToProcess = pendingItems.slice(0, MAX_BATCH_SIZE)
+      
+      if (pendingItems.length > MAX_BATCH_SIZE) {
+        console.log(`⚠️ Large queue detected. Processing ${MAX_BATCH_SIZE} of ${pendingItems.length} items (batching for performance)`)
+      } else {
+        console.log(`🔄 Processing ${itemsToProcess.length} queued items...`)
+      }
 
       let successCount = 0
       let failureCount = 0
+      const MAX_RETRIES = 10 // Maximum retries before auto-deletion
 
       // Process each queue item
-      for (const item of pendingItems) {
+      for (const item of itemsToProcess) {
         try {
+          // 🛡️ SAFEGUARD: Auto-delete items that have failed too many times
+          if (item.retryCount && item.retryCount >= MAX_RETRIES) {
+            console.warn(`🗑️ Auto-deleting item ${item.objectStore}/${item.recordId} - exceeded ${MAX_RETRIES} retries`)
+            await offlineDB.delete('sync_queue', item.id)
+            failureCount++
+            continue
+          }
+          
           const success = await this.syncItem(item)
           if (success) {
             // Mark as synced
@@ -188,22 +237,32 @@ export class SyncQueueEngine {
             successCount++
           } else {
             // Increment retry count
+            const newRetryCount = (item.retryCount || 0) + 1
             await offlineDB.update('sync_queue', item.id, {
               ...item,
-              retryCount: (item.retryCount || 0) + 1,
+              retryCount: newRetryCount,
               errorMessage: 'Sync failed'
             })
+            
+            if (newRetryCount >= MAX_RETRIES) {
+              console.warn(`⚠️ Item ${item.objectStore}/${item.recordId} will be auto-deleted next sync cycle`)
+            }
             failureCount++
           }
         } catch (error) {
           console.error(`❌ Error syncing item ${item.id}:`, error)
           
           // Update retry count and error
+          const newRetryCount = (item.retryCount || 0) + 1
           await offlineDB.update('sync_queue', item.id, {
             ...item,
-            retryCount: (item.retryCount || 0) + 1,
+            retryCount: newRetryCount,
             errorMessage: error instanceof Error ? error.message : 'Unknown error'
           })
+          
+          if (newRetryCount >= MAX_RETRIES) {
+            console.warn(`⚠️ Item ${item.objectStore}/${item.recordId} will be auto-deleted next sync cycle`)
+          }
           failureCount++
         }
       }
