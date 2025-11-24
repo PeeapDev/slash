@@ -1,9 +1,9 @@
 // Service Worker for SLASH PWA
 // Handles offline functionality, caching, and background sync
 
-const CACHE_NAME = 'slash-pwa-v1'
-const STATIC_CACHE = 'slash-static-v1'
-const DYNAMIC_CACHE = 'slash-dynamic-v1'
+const CACHE_NAME = 'slash-pwa-v2'
+const STATIC_CACHE = 'slash-static-v2'
+const DYNAMIC_CACHE = 'slash-dynamic-v2'
 
 // Assets to cache immediately
 const STATIC_ASSETS = [
@@ -183,9 +183,11 @@ async function handleAssetRequest(request) {
     // If not in cache, fetch from network
     const networkResponse = await fetch(request)
     
-    // Cache the response
-    const cache = await caches.open(DYNAMIC_CACHE)
-    cache.put(request.clone(), networkResponse.clone())
+    // Only cache GET requests (HEAD, POST, etc. cannot be cached)
+    if (request.method === 'GET' && networkResponse.ok) {
+      const cache = await caches.open(DYNAMIC_CACHE)
+      cache.put(request.clone(), networkResponse.clone())
+    }
     
     return networkResponse
   } catch (error) {
