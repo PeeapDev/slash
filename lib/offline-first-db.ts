@@ -595,6 +595,13 @@ class OfflineFirstDB {
 
   // Sync Queue Management
   private async addToSyncQueue(operation: 'CREATE' | 'UPDATE' | 'DELETE', objectStore: string, recordId: string, data: any): Promise<void> {
+    // Skip sync for local-only stores (prevents infinite loops!)
+    const localOnlyStores = ['sync_queue', 'audit_trails', 'settings', 'app_settings']
+    if (localOnlyStores.includes(objectStore)) {
+      console.log(`⏭️ Skipping sync for local-only store: ${objectStore}`)
+      return
+    }
+    
     const queueItem: SyncQueueItem = {
       id: uuidv4(),
       queueId: uuidv4(),
