@@ -18,7 +18,7 @@ interface BrandingConfig extends BaseRecord {
 
 export default function BrandingSettings() {
   const [config, setConfig] = useState<BrandingConfig>({
-    id: 'branding-config',
+    id: 'branding-config', // Must match the ID we use in getById
     companyName: 'SLASH',
     tagline: 'Health Data Collection Platform',
     primaryColor: '#0ea5e9',
@@ -99,6 +99,7 @@ export default function BrandingSettings() {
       
       const updatedConfig: BrandingConfig = {
         ...config,
+        id: 'branding-config', // Ensure consistent ID
         version: (config.version || 1) + 1,
         updatedAt: new Date().toISOString(),
         syncStatus: 'synced',
@@ -108,8 +109,12 @@ export default function BrandingSettings() {
       
       console.log('💾 Saving branding config:', updatedConfig)
       
-      // Save to IndexedDB
+      // Save to IndexedDB with explicit ID
       await offlineDB.createOrUpdate('app_settings', updatedConfig)
+      
+      // Verify it was saved
+      const verifyConfig = await offlineDB.getById('app_settings', 'branding-config')
+      console.log('✅ Verified saved config:', verifyConfig)
       
       setConfig(updatedConfig)
       setSaved(true)
