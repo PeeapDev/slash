@@ -5,17 +5,15 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Upload, Image as ImageIcon, Save, X, Check } from "lucide-react"
-import { offlineDB } from "@/lib/offline-first-db"
+import { offlineDB, BaseRecord } from "@/lib/offline-first-db"
 
-interface BrandingConfig {
-  id: string
+interface BrandingConfig extends BaseRecord {
   companyLogo?: string
   appLogo?: string
   appIcon?: string
   companyName?: string
   tagline?: string
   primaryColor?: string
-  updatedAt: string
 }
 
 export default function BrandingSettings() {
@@ -24,7 +22,12 @@ export default function BrandingSettings() {
     companyName: 'SLASH',
     tagline: 'Health Data Collection Platform',
     primaryColor: '#0ea5e9',
-    updatedAt: new Date().toISOString()
+    version: 1,
+    syncStatus: 'synced',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    deviceId: 'system',
+    collectorId: 'system'
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -90,9 +93,11 @@ export default function BrandingSettings() {
       setSaving(true)
       await offlineDB.init()
       
-      const updatedConfig = {
+      const updatedConfig: BrandingConfig = {
         ...config,
-        updatedAt: new Date().toISOString()
+        version: (config.version || 1) + 1,
+        updatedAt: new Date().toISOString(),
+        syncStatus: 'synced'
       }
       
       // Save to IndexedDB
