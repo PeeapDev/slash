@@ -93,12 +93,20 @@ export default function BrandingSettings() {
       setSaving(true)
       await offlineDB.init()
       
+      // Get deviceId and collectorId from offlineDB
+      const deviceId = (offlineDB as any).deviceId || 'system'
+      const collectorId = (offlineDB as any).collectorId || 'system'
+      
       const updatedConfig: BrandingConfig = {
         ...config,
         version: (config.version || 1) + 1,
         updatedAt: new Date().toISOString(),
-        syncStatus: 'synced'
+        syncStatus: 'synced',
+        deviceId,
+        collectorId
       }
+      
+      console.log('💾 Saving branding config:', updatedConfig)
       
       // Save to IndexedDB
       await offlineDB.createOrUpdate('app_settings', updatedConfig)
@@ -106,15 +114,16 @@ export default function BrandingSettings() {
       setConfig(updatedConfig)
       setSaved(true)
       
-      console.log('✅ Branding saved:', updatedConfig)
+      console.log('✅ Branding saved successfully!')
       
       // Apply branding immediately
       applyBranding(updatedConfig)
       
+      // Auto-hide success message after 3 seconds
       setTimeout(() => setSaved(false), 3000)
     } catch (error) {
-      console.error('Error saving branding:', error)
-      alert('Failed to save branding settings')
+      console.error('❌ Error saving branding:', error)
+      alert(`Failed to save branding settings: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
       setSaving(false)
     }

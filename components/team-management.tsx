@@ -83,14 +83,15 @@ export default function TeamManagement() {
   const handleToggleStatus = async (member: TeamMember) => {
     try {
       const { offlineDB } = await import('@/lib/offline-first-db')
-      const newStatus = member.isActive ? 'suspended' : 'active'
+      const newStatus = member.isActive ? ('suspended' as const) : ('active' as const)
       
-      await offlineDB.update('team_members', member.id, {
-        ...member,
+      const updates: Partial<TeamMember> = {
         isActive: !member.isActive,
         employmentStatus: newStatus,
         updatedAt: new Date().toISOString()
-      })
+      }
+      
+      await offlineDB.update('team_members', member.id, updates)
       
       console.log(`✅ Updated member status: ${member.fullName}`)
       loadTeamMembers()
@@ -382,21 +383,28 @@ function TeamMemberForm({
       
       if (member) {
         // Update existing member
-        await offlineDB.update('team_members', member.id, {
-          ...member,
+        const updatedMember: Partial<TeamMember> = {
           ...formData,
           permissions: rolePermissions,
           updatedAt: new Date().toISOString()
-        })
+        }
+        
+        await offlineDB.update('team_members', member.id, updatedMember)
         console.log(`✅ Updated team member: ${formData.fullName}`)
       } else {
         // Create new member
         const newMember: TeamMember = {
           id: `TEAM_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           userId: `USER_${Date.now()}`,
-          ...formData,
+          fullName: formData.fullName,
+          email: formData.email,
+          role: formData.role,
+          regionId: formData.regionId || undefined,
+          districtId: formData.districtId || undefined,
+          teamId: formData.teamId || undefined,
+          supervisorId: formData.supervisorId || undefined,
           isActive: true,
-          employmentStatus: 'active',
+          employmentStatus: 'active' as const,
           hireDate: new Date().toISOString(),
           permissions: rolePermissions,
           createdAt: new Date().toISOString(),
