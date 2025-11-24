@@ -29,13 +29,12 @@ export default function AdminDashboard() {
   const [auditTrails, setAuditTrails] = useState<AuditTrail[]>([])
   const [projects, setProjects] = useState<ProjectMetadata[]>([])
   const [syncQueue, setSyncQueue] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
 
   const loadData = async () => {
     try {
-      if (!loading) setRefreshing(true)
+      setRefreshing(true)
       console.log('📊 Loading dashboard data from IndexedDB...')
       
       // Initialize offlineDB first
@@ -99,29 +98,20 @@ export default function AdminDashboard() {
       console.log('✅ Dashboard data set successfully')
     } catch (error) {
       console.error("❌ CRITICAL Error loading dashboard data:", error)
-      alert(`Dashboard loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      // Don't alert on background load failures - just log them
+      console.error('Dashboard data load failed, will retry on next sync')
     } finally {
-      console.log('🏁 Setting loading to false')
-      setLoading(false)
       setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    console.log('🚀 AdminDashboard mounted - starting data load')
+    console.log('🚀 AdminDashboard mounted - loading data in background')
     
-    // Safety timeout to prevent infinite loading
-    const safetyTimeout = setTimeout(() => {
-      console.warn('⚠️ Safety timeout triggered - forcing loading to false')
-      setLoading(false)
-      setRefreshing(false)
-    }, 5000) // 5 seconds max - faster recovery
-    
-    loadData().then(() => {
-      clearTimeout(safetyTimeout)
-    }).catch(err => {
+    // Load data immediately in background (no loading screen)
+    loadData().catch(err => {
       console.error('loadData failed:', err)
-      clearTimeout(safetyTimeout)
+      setRefreshing(false)
     })
     
     // Subscribe to sync events to auto-reload dashboard
@@ -149,7 +139,6 @@ export default function AdminDashboard() {
     
     return () => {
       clearInterval(interval)
-      clearTimeout(safetyTimeout)
       if (unsubscribe) unsubscribe()
     }
   }, [])
@@ -260,13 +249,6 @@ export default function AdminDashboard() {
     .sort((a, b) => b.accuracy - a.accuracy)
     .slice(0, 5)
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-lg">Loading dashboard data...</div>
-      </div>
-    )
-  }
   return (
     <div className="space-y-6">
       {/* Refresh Button - Top Right */}
