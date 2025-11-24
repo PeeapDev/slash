@@ -344,22 +344,23 @@ export interface OfflineDBSchema {
   participants: Participant[]
   surveys: Survey[]
   samples: Sample[]
-  sample_types: SampleType[]
-  lab_results: LabResult[]
-  team_members: TeamMemberDB[]
-  teams: Team[]
+  sample_types: any[]
+  lab_results: any[]
+  team_members: any[]
+  teams: any[]
   forms: Form[]
   form_responses: FormResponse[]
   project_metadata: ProjectMetadata[]
   sync_queue: SyncQueueItem[]
   audit_trails: AuditTrail[]
   settings: Settings[]
+  app_settings: any[]
 }
 
 // Offline-First Database Service
 class OfflineFirstDB {
   private dbName = 'SLASH_FIELDWORK_DB'
-  private dbVersion = 6 // Increased for teams store, gender, and address fields
+  private dbVersion = 7 // Increased for app_settings store
   private db: IDBDatabase | null = null
   private deviceId: string
   private collectorId: string
@@ -397,7 +398,7 @@ class OfflineFirstDB {
           'households', 'participants', 'surveys', 'samples',
           'forms', 'form_responses', 'project_metadata',
           'sample_types', 'lab_results', 'team_members', 'teams',
-          'sync_queue', 'audit_trails', 'settings'
+          'sync_queue', 'audit_trails', 'settings', 'app_settings'
         ]
 
         storeNames.forEach(storeName => {
@@ -535,6 +536,17 @@ class OfflineFirstDB {
       request.onsuccess = () => resolve(request.result || null)
       request.onerror = () => reject(request.error)
     })
+  }
+
+  // Create or update - convenience method for upsert operations
+  async createOrUpdate<T extends BaseRecord>(storeName: keyof OfflineDBSchema, record: T): Promise<void> {
+    const existing = await this.getById(storeName, record.id)
+    
+    if (existing) {
+      return this.update(storeName, record.id, record)
+    } else {
+      return this.create(storeName, record)
+    }
   }
 
   async getAll<T>(storeName: keyof OfflineDBSchema, filter?: { index?: string; value?: any }): Promise<T[]> {

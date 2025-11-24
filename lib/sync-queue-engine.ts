@@ -161,7 +161,7 @@ export class SyncQueueEngine {
       
       // Get all pending sync queue items
       const queueItems = await offlineDB.getAll<SyncQueueItem>('sync_queue')
-      const pendingItems = queueItems.filter(item => item.status === 'pending')
+      const pendingItems = queueItems.filter(item => item.syncStatus === 'pending')
       
       if (pendingItems.length === 0) {
         console.log('✅ Sync queue empty - nothing to sync')
@@ -181,8 +181,8 @@ export class SyncQueueEngine {
             // Mark as synced
             await offlineDB.update('sync_queue', item.id, {
               ...item,
-              status: 'synced',
-              syncedAt: new Date().toISOString(),
+              syncStatus: 'synced',
+              updatedAt: new Date().toISOString(),
               retryCount: item.retryCount || 0
             })
             successCount++
@@ -191,7 +191,7 @@ export class SyncQueueEngine {
             await offlineDB.update('sync_queue', item.id, {
               ...item,
               retryCount: (item.retryCount || 0) + 1,
-              lastError: 'Sync failed'
+              errorMessage: 'Sync failed'
             })
             failureCount++
           }
@@ -202,7 +202,7 @@ export class SyncQueueEngine {
           await offlineDB.update('sync_queue', item.id, {
             ...item,
             retryCount: (item.retryCount || 0) + 1,
-            lastError: error instanceof Error ? error.message : 'Unknown error'
+            errorMessage: error instanceof Error ? error.message : 'Unknown error'
           })
           failureCount++
         }
@@ -220,24 +220,60 @@ export class SyncQueueEngine {
     }
   }
 
-  // Sync individual item to cloud (placeholder for now)
+  // Sync individual item to cloud - REAL SUPABASE SYNC
   private async syncItem(item: SyncQueueItem): Promise<boolean> {
-    // TODO: Replace with actual API endpoints when backend is ready
-    console.log(`🔄 Syncing ${item.operation} on ${item.tableName}:`, item.recordId)
+    console.log(`🔄 Syncing ${item.operation} on ${item.objectStore}:`, item.recordId)
     
     try {
-      // Simulate API call for now
-      const apiEndpoint = this.getApiEndpoint(item.tableName, item.operation)
+      // Import Supabase client
+      const { supabase } = await import('@/lib/database')
       
-      if (!apiEndpoint) {
-        console.log(`⚠️ No API endpoint for ${item.tableName} ${item.operation} - marking as synced`)
-        return true // Mark as synced since we don't have backend yet
+      if (!supabase) {
+        console.warn('⚠️ Supabase not configured - skipping sync')
+        return true // Mark as synced to avoid retries
       }
 
-      // For now, just simulate successful sync
-      // In future, this will be actual HTTP requests
-      console.log(`✅ Simulated sync: ${apiEndpoint}`)
-      return true
+      // Get the actual record data from IndexedDB
+      const record = await offlineDB.getById(item.objectStore as any, item.recordId)
+      
+      if (!record) {
+        console.warn(`⚠️ Record not found: ${item.recordId}`)
+        return false
+      }
+
+      // Perform the appropriate Supabase operation
+      switch (item.operation) {
+        case 'CREATE':
+        case 'UPDATE':
+          const { error: upsertError } = await supabase
+            .from(item.objectStore)
+            .upsert(record, { onConflict: 'id' })
+          
+          if (upsertError) {
+            console.error(`❌ Supabase sync error:`, upsertError)
+            return false
+          }
+          console.log(`✅ Synced to Supabase: ${item.objectStore}/${item.recordId}`)
+          return true
+
+        case 'DELETE':
+          const { error: deleteError } = await supabase
+            .from(item.objectStore)
+            .delete()
+            .eq('id', item.recordId)
+          
+          if (deleteError) {
+            console.error(`❌ Supabase delete error:`, deleteError)
+            return false
+          }
+          console.log(`✅ Deleted from Supabase: ${item.objectStore}/${item.recordId}`)
+          return true
+
+        default:
+          console.warn(`⚠️ Unknown operation: ${item.operation}`)
+          return false
+      }
+      
 
       /* 
       // Future implementation with real API:
@@ -282,8 +318,8 @@ export class SyncQueueEngine {
     
     return {
       totalItems: queueItems.length,
-      pendingItems: queueItems.filter(i => i.status === 'pending').length,
-      syncedItems: queueItems.filter(i => i.status === 'synced').length,
+      pendingItems: queueItems.filter(i => i.syncStatus === 'pending').length,
+      syncedItems: queueItems.filter(i => i.syncStatus === 'synced').length,
       failedItems: queueItems.filter(i => i.retryCount && i.retryCount > 3).length,
       isOnline: this.isOnline,
       isRunning: this.isRunning
@@ -303,7 +339,7 @@ export class SyncQueueEngine {
   // Clear synced items (cleanup)
   async clearSyncedItems() {
     const queueItems = await offlineDB.getAll<SyncQueueItem>('sync_queue')
-    const syncedItems = queueItems.filter(i => i.status === 'synced')
+    const syncedItems = queueItems.filter(i => i.syncStatus === 'synced')
     
     for (const item of syncedItems) {
       await offlineDB.delete('sync_queue', item.id)

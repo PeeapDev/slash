@@ -12,6 +12,8 @@ import DatabaseSetup from "@/components/database-setup"
 import DualDatabaseDemo from "@/components/dual-database-demo"
 import PWAStatus from "@/components/pwa-status"
 import SyncStatus from "@/components/sync-status"
+import BrandingSettings from "@/components/branding-settings"
+import SyncDiagnostic from "@/components/sync-diagnostic"
 
 // Type definitions for roles
 interface Role {
@@ -215,6 +217,16 @@ export default function AppConfiguration() {
           }`}
         >
           Sync Queue
+        </button>
+        <button
+          onClick={() => setActiveTab("branding")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            activeTab === "branding"
+              ? "bg-primary text-primary-foreground"
+              : "hover:bg-muted text-foreground"
+          }`}
+        >
+          🎨 Branding
         </button>
       </div>
 
@@ -437,13 +449,15 @@ export default function AppConfiguration() {
       {/* Sync Queue Tab */}
       {activeTab === "sync" && (
         <div className="space-y-6">
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Data Synchronization Queue</h2>
-            <p className="text-muted-foreground">
-              Monitor the IndexedDB sync queue, view pending items, and manage data synchronization to cloud services.
-            </p>
-            <SyncStatus />
-          </div>
+          <SyncStatus />
+          <SyncDiagnostic />
+        </div>
+      )}
+
+      {/* Branding Tab */}
+      {activeTab === "branding" && (
+        <div className="space-y-6">
+          <BrandingSettings />
         </div>
       )}
     </div>
