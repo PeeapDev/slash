@@ -6,6 +6,7 @@ import "./globals.css"
 import { ThemeProvider } from "@/lib/theme-context"
 import DevCleanup from "@/components/dev-cleanup"
 import SyncInitializer from "@/components/sync-initializer"
+import DynamicFavicon from "@/components/dynamic-favicon"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -69,6 +70,7 @@ export default function RootLayout({
         <ThemeProvider>
           <DevCleanup />
           <SyncInitializer />
+          <DynamicFavicon />
           {children}
         </ThemeProvider>
         <Analytics />

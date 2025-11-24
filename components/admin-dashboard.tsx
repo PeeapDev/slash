@@ -115,7 +115,7 @@ export default function AdminDashboard() {
       console.warn('⚠️ Safety timeout triggered - forcing loading to false')
       setLoading(false)
       setRefreshing(false)
-    }, 10000) // 10 seconds max
+    }, 5000) // 5 seconds max - faster recovery
     
     loadData().then(() => {
       clearTimeout(safetyTimeout)
