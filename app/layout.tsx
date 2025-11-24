@@ -5,6 +5,7 @@ import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { ThemeProvider } from "@/lib/theme-context"
 import DevCleanup from "@/components/dev-cleanup"
+import SyncInitializer from "@/components/sync-initializer"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -67,6 +68,7 @@ export default function RootLayout({
       <body className={`font-sans antialiased`}>
         <ThemeProvider>
           <DevCleanup />
+          <SyncInitializer />
           {children}
         </ThemeProvider>
         <Analytics />

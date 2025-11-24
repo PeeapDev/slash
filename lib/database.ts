@@ -1,10 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
 // Supabase client for auth and real-time features
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || ''
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'https://placeholder.supabase.co'
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBsYWNlaG9sZGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE2NDUxOTI4MDAsImV4cCI6MTk2MDc2ODgwMH0.placeholder'
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Only create Supabase client if valid credentials exist
+export const supabase = (supabaseUrl && supabaseUrl !== 'https://placeholder.supabase.co') 
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null as any
 
 // PostgreSQL disabled for Vercel deployment - using IndexedDB-first architecture
 // Neon PostgreSQL connection pool for main database operations (DISABLED)
