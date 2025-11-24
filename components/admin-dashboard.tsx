@@ -40,23 +40,51 @@ export default function AdminDashboard() {
       
       // Initialize offlineDB first
       await offlineDB.init()
+      console.log('✅ IndexedDB initialized')
       
-      const [householdsData, participantsData, samplesData, labData, auditData, projectsData, queueData] = await Promise.all([
-        offlineDB.getAll<Household>('households'),
-        offlineDB.getAll<Participant>('participants'),
-        offlineDB.getAll<Sample>('samples'),
-        offlineDB.getAll<LabResult>('lab_results'),
-        offlineDB.getAll<AuditTrail>('audit_trails'),
-        offlineDB.getAll<ProjectMetadata>('project_metadata'),
-        offlineDB.getAll('sync_queue')
-      ])
+      // Load data with individual error handling
+      const householdsData = await offlineDB.getAll<Household>('households').catch(e => {
+        console.error('Error loading households:', e)
+        return []
+      })
+      
+      const participantsData = await offlineDB.getAll<Participant>('participants').catch(e => {
+        console.error('Error loading participants:', e)
+        return []
+      })
+      
+      const samplesData = await offlineDB.getAll<Sample>('samples').catch(e => {
+        console.error('Error loading samples:', e)
+        return []
+      })
+      
+      const labData = await offlineDB.getAll<LabResult>('lab_results').catch(e => {
+        console.error('Error loading lab results:', e)
+        return []
+      })
+      
+      const auditData = await offlineDB.getAll<AuditTrail>('audit_trails').catch(e => {
+        console.error('Error loading audit trails:', e)
+        return []
+      })
+      
+      const projectsData = await offlineDB.getAll<ProjectMetadata>('project_metadata').catch(e => {
+        console.error('Error loading projects:', e)
+        return []
+      })
+      
+      const queueData = await offlineDB.getAll('sync_queue').catch(e => {
+        console.error('Error loading sync queue:', e)
+        return []
+      })
       
       console.log('📊 Dashboard data loaded:', {
         households: householdsData.length,
         participants: participantsData.length,
         samples: samplesData.length,
         labResults: labData.length,
-        projects: projectsData.length
+        projects: projectsData.length,
+        syncQueue: queueData.length
       })
       
       setHouseholds(householdsData)
@@ -67,16 +95,34 @@ export default function AdminDashboard() {
       setProjects(projectsData)
       setSyncQueue(queueData)
       setLastRefresh(new Date())
+      
+      console.log('✅ Dashboard data set successfully')
     } catch (error) {
-      console.error("Error loading dashboard data:", error)
+      console.error("❌ CRITICAL Error loading dashboard data:", error)
+      alert(`Dashboard loading failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
+      console.log('🏁 Setting loading to false')
       setLoading(false)
       setRefreshing(false)
     }
   }
 
   useEffect(() => {
-    loadData()
+    console.log('🚀 AdminDashboard mounted - starting data load')
+    
+    // Safety timeout to prevent infinite loading
+    const safetyTimeout = setTimeout(() => {
+      console.warn('⚠️ Safety timeout triggered - forcing loading to false')
+      setLoading(false)
+      setRefreshing(false)
+    }, 10000) // 10 seconds max
+    
+    loadData().then(() => {
+      clearTimeout(safetyTimeout)
+    }).catch(err => {
+      console.error('loadData failed:', err)
+      clearTimeout(safetyTimeout)
+    })
     
     // Subscribe to sync events to auto-reload dashboard
     let unsubscribe: (() => void) | undefined
@@ -97,11 +143,13 @@ export default function AdminDashboard() {
     
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
+      console.log('🔄 Auto-refresh triggered')
       loadData()
     }, 30000)
     
     return () => {
       clearInterval(interval)
+      clearTimeout(safetyTimeout)
       if (unsubscribe) unsubscribe()
     }
   }, [])
