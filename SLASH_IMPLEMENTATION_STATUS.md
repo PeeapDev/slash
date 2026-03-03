@@ -1,127 +1,141 @@
-# SLASH Platform - Implementation Status & Roadmap
+# SLASH Platform - Implementation Status & Comparison with ODK
 
-## Implemented (Current)
+## What is SLASH?
 
-### Platform & Architecture
-- Offline-first PWA (installable, works without internet)
-- IndexedDB as primary local datastore
-- Sync queue store present (sync engine not fully enabled)
-- Deployed on Vercel
+SLASH is an offline-first health data collection and laboratory management platform built as a Progressive Web App (PWA). It combines ODK-style form building and data collection with specialized lab/sample workflows and AI-driven data quality analytics.
 
-## Modules (Core Workflows)
-- Household management
-- Participant management
-- Survey management (questionnaire flows)
-- Sample Management Module
-  - Sample types
-  - Sample ID generation
-  - Sample lifecycle tracking
-  - Lab batch workflow
-  - Lab results entry
-  - Audit logging
-- Project management (campaign/cycle level grouping)
+---
 
-### Form Builder
-- Dynamic form builder UI
-- Inline field configuration (gear icons)
-- Field reorder / delete
-- Working preview (mobile simulation)
-- Dynamic form renderer for field collectors
+## Similarities with ODK / KoboToolbox / SurveyCTO
 
-### Roles & UI Surfaces
-- Role-based dashboards (admin, supervisor, field collector, lab technician)
-- RBAC management UI (role/team/region modules)
+SLASH shares the same core philosophy and many of the same capabilities as the ODK ecosystem:
 
-### AI (Current)
-- AI dashboard UI and settings UI
-- Multi-provider settings stored in browser localStorage
-- Client-side provider calls for:
-  - Data validation
-  - Missing data detection
-  - Anomaly detection
-  - Summary insights
+| Feature | ODK / KoboToolbox / SurveyCTO | SLASH |
+|---|---|---|
+| **XForms standard** | Native XForm XML + XLSForm | Full XForm XML & XLSForm export with groups/repeats |
+| **Offline data collection** | ODK Collect app / KoboCollect | PWA with IndexedDB — works fully offline, installable |
+| **Form builder** | KoboToolbox drag-drop builder | Visual drag-drop builder with live preview |
+| **Field types** | text, integer, decimal, select_one, select_multiple, date, time, geopoint, barcode, image, audio, note, calculate, range, rank | text, integer, decimal, select, radio, checkbox, date, time, dateTime, gps, barcode, image/file, note, calculate, likert, rating, range, ranking |
+| **Skip logic / relevance** | `relevant` column in XLSForm | Full relevance engine: 10 operators (eq, neq, gt, lt, contains, etc.) with AND/OR |
+| **Constraints / validation** | `constraint` column + XPath expressions | Regex, min/max range, length, email, phone, URL, custom expressions |
+| **Calculated fields** | `calculate` column with XPath | Expression evaluator with `${field}` references + 16 functions |
+| **Repeat groups** | `begin_repeat` / `end_repeat` | Repeat groups with add/remove instances at runtime |
+| **Cascading selects** | `choice_filter` column | `choiceFilterExpression` with parent-child filtering |
+| **Groups** | `begin_group` / `end_group` | Groups with `field-list` appearance (all fields on one page) |
+| **Appearances** | `quick`, `minimal`, `horizontal`, `signature`, etc. | `quick` (auto-advance), `horizontal`, `multiline`, `signature` (canvas draw) |
+| **or_other** | `or_other` keyword on select types | `orOther` toggle — auto-appends "Other" with free-text input |
+| **Guidance hints** | `guidance_hint` column | `guidanceHint` — collapsible "More info" below hint |
+| **Randomize choices** | `randomize` parameter | `randomizeChoices` — Fisher-Yates shuffle seeded by field ID |
+| **Multi-language** | `label::language` columns | `translations` record per field + language selector in form runtime |
+| **Barcode / QR scanning** | Via device camera | BarcodeDetector API with camera overlay |
+| **GPS capture** | `geopoint` type | `gps` field type with lat/lng capture |
+| **Metadata** | `start`, `end`, `today`, `deviceid` | Auto-captured: deviceId, startedAt, completedAt, today |
+| **Audit logging** | `audit` meta type | Event log: form_open, field_change, constraint_violation, save_draft, submit |
+| **Submission editing** | Edit saved submissions | `?responseId=xxx` URL param pre-fills from saved submission |
+| **Draft saving** | Save as draft in Collect | Save draft functionality in form runtime |
+| **Submission review** | OData review states | Review states: received, hasIssues, approved, rejected |
+| **Project management** | ODK Central projects | Projects with forms, submissions, app users, web users |
+| **User management** | App users + web users in Central | App users (field) + web users (portal) with role-based access |
+| **Data export** | CSV, JSON, OData feed | XForm XML, XLSForm CSV, JSON, CSV export |
+| **Expression functions** | XPath function library | `round()`, `int()`, `string-length()`, `substr()`, `not()`, `selected()`, `count-selected()`, `coalesce()`, `min()`, `max()`, `sum()`, `count()`, `if()`, `today()`, `now()`, `concat()` |
 
-## Planned (To Reach SurveyCTO / KoboToolbox Parity)
+---
 
-### Highest Priority
-- Supabase auth (real authentication)
-- Row Level Security (RLS) and server-enforced permissions
-- Production sync engine (bi-directional sync, retries, conflict resolution)
-- Enterprise-grade security (encryption at rest/in transit, key management)
-- Automated data quality checks (scheduled audits + monitoring dashboards)
+## Key Differences from ODK
 
-### Form Logic & Data Quality
-- Skip logic / relevance conditions
-- Constraints and custom validations
-- Calculations within forms
-- Repeat groups and roster-style data capture
-- Preloaded datasets for lookups (cascading selects)
+### What SLASH adds beyond ODK
 
-### Integrations & Data Ops
-- Export tooling (CSV/XLSX, Stata/SPSS-friendly)
-- Webhooks and external integrations
-- API documentation + token-based API access
+| Capability | ODK Ecosystem | SLASH |
+|---|---|---|
+| **AI-driven data quality** | Not available | Multi-provider AI (OpenAI, Claude, DeepSeek, Groq) for validation, anomaly detection, missing data analysis, summary insights |
+| **Lab / sample workflow** | Not available (generic data only) | Full sample lifecycle: sample types, ID generation, batch processing, lab results entry, audit trail |
+| **Health research focus** | General-purpose survey tool | Purpose-built for health research with household → participant → sample → lab result data chain |
+| **PWA architecture** | Native Android app (ODK Collect) | Runs in any browser — no app store install needed, auto-updates |
+| **Real-time preview** | XLSForm preview tools (separate) | Live mobile-frame preview inside the form builder |
+| **Branding / white-label** | Self-hosted Central (limited) | Full branding settings: company name, logos, favicon, color theme — all persisted to IndexedDB |
+| **IndexedDB storage** | SQLite in native app | Write-behind cache pattern: in-memory + async IndexedDB with Supabase sync |
+| **Signature capture** | Via external apps | Built-in canvas-based signature drawing |
+| **Rating / Likert widgets** | Custom appearances needed | Native `rating` (star) and `likert` (scale) field types |
+| **dateTime combo** | Separate date + time fields | Single `dateTime` field type |
+| **Ranking widget** | `rank` type in newer ODK | Native drag-to-reorder ranking with `@dnd-kit` |
 
-### Mobile Collection Enhancements
-- GPS capture
-- Photo/audio capture
-- Barcode/QR scanning
-- Offline dataset publishing / advanced offline transfer
+### What ODK has that SLASH is still building
 
-### Reporting & Analytics
-- Built-in statistical summaries
-- Custom report builder
-- Scheduled reports
+| Capability | Status in SLASH |
+|---|---|
+| **End-to-end encryption** | Not yet — planned |
+| **Production sync engine** | Supabase sync layer exists but not fully enabled for bi-directional conflict resolution |
+| **Server-enforced permissions** | UI roles exist; server-side RLS pending |
+| **Scheduled QC reports** | AI analysis is manual; automation pipeline planned |
+| **Photo / audio capture** | File upload exists; native media capture planned |
+| **External datasets (pulldata)** | Architecture designed; Supabase Storage upload planned |
+| **Unique constraint (server)** | Async validation via Supabase designed; not yet wired |
+| **OData feed** | Not yet — CSV/JSON export available |
+| **Webhooks** | Not yet |
+| **Stata / SPSS export** | Not yet |
 
-## AI Implementation (Rebuilt) - Provider Layer + Groq
+---
 
-### What Changed
-- AI calls are now routed through server API routes instead of calling vendor APIs directly from the browser.
-- New API routes:
-  - `POST /api/ai/analyze`
-  - `POST /api/ai/test`
-- Providers supported:
-  - OpenAI
-  - Claude (Anthropic)
-  - DeepSeek
-  - Groq
+## Architecture Comparison
 
-### How API Keys Are Resolved
-- **Preferred**: Set server-side environment variables (recommended for production).
-- **Fallback**: Use the API key stored locally in the browser (current UI behavior).
+| Aspect | ODK Central | SLASH |
+|---|---|---|
+| **Server** | Node.js + PostgreSQL (self-hosted) | Supabase (hosted) + Vercel (frontend) |
+| **Client** | ODK Collect (Android) + web UI | PWA (any device/browser) |
+| **Offline storage** | SQLite on device | IndexedDB with write-behind cache |
+| **Sync protocol** | OpenRosa / OData push | Custom queue-based sync to Supabase |
+| **Form standard** | XForms (XLSForm → XML) | Internal JSON model + XForm/XLSForm export |
+| **Authentication** | Session-based in Central | Supabase Auth (planned: full RLS) |
+| **File storage** | Central server filesystem | Supabase Storage (planned) |
+| **AI integration** | None | Server-side API routes → OpenAI/Claude/DeepSeek/Groq |
+
+---
+
+## AI Implementation
+
+### Providers Supported
+- OpenAI (GPT-4, GPT-3.5)
+- Anthropic Claude
+- DeepSeek
+- Groq
+
+### How It Works
+- AI calls routed through server API routes (`POST /api/ai/analyze`, `POST /api/ai/test`)
+- API keys resolved: server environment variables (preferred) → browser-stored keys (fallback)
+- Analysis capabilities: data validation, missing data detection, anomaly detection, summary insights
 
 ### Environment Variables
-- `OPENAI_API_KEY`
-- `ANTHROPIC_API_KEY`
-- `DEEPSEEK_API_KEY`
-- `GROQ_API_KEY`
+```
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+DEEPSEEK_API_KEY=
+GROQ_API_KEY=
+```
 
-## Feature Comparison Table (SurveyCTO vs KoboToolbox vs SLASH)
+---
 
-| Capability Area | SurveyCTO | KoboToolbox | SLASH (Current) |
-|---|---|---|---|
-| Offline data collection | Yes (advanced offline workflows) | Yes | Yes (PWA + IndexedDB) |
-| Mobile app | Yes (SurveyCTO Collect) | Yes (KoboCollect) | PWA (installable) |
-| Form builder | Yes | Yes | Yes |
-| Skip logic / relevance | Yes | Yes | Partial (basic dynamic forms; needs full logic engine) |
-| Constraints / validations | Yes | Yes | Partial (needs configurable constraints) |
-| Calculations in-survey | Yes | Yes | Not yet |
-| Repeat groups / rosters | Yes | Yes | Not yet |
-| Preloaded datasets / lookups | Yes | Yes | Not yet |
-| Audit trails | Yes | Partial | Yes (audit store + sample audit logs) |
-| Data quality monitoring dashboards | Yes | Yes | Partial (AI dashboard exists; needs automated QC pipeline) |
-| Scheduled automated QC reports | Yes (nightly audits) | Partial | Not yet |
-| Exports (CSV/XLSX/etc.) | Yes | Yes | Partial (needs export module) |
-| API / integrations | Yes (Power BI/Salesforce, etc.) | Yes (API stack) | Partial (REST endpoints exist for sample module; needs auth + broader API strategy) |
-| End-to-end encryption | Yes | Partial | Not yet |
-| Granular server-enforced permissions | Yes | Yes | Partial (UI roles exist; server enforcement pending) |
-| Multi-language forms | Yes | Yes | Not yet |
-| Media capture (photo/audio) | Yes | Yes | Not yet |
-| GPS capture | Yes | Yes | Not yet |
-| Barcode/QR | Yes (via devices) | Yes | Planned |
-| Specialized lab/sample workflow | Limited | Limited | Yes (core differentiator) |
-| AI analytics | Emerging | Limited | Yes (core differentiator, evolving) |
+## Current Module Summary
 
-## Notes
-- SLASH’s differentiator is the **health research + sample/lab workflow** and a pathway to **AI-driven QC**.
-- To match SurveyCTO/KoboToolbox, the biggest gaps are **form logic**, **server-side security**, and **production-grade sync + QC automation**.
+### Data Collection
+- Form builder with 18+ field types
+- Full form logic engine (skip logic, constraints, calculations, cascading selects)
+- Repeat groups, multi-language, appearances, or_other
+- XForm XML & XLSForm CSV export
+- Barcode scanning, GPS capture, signature capture
+
+### Health Research Workflow
+- Household management
+- Participant management
+- Sample management (types, ID generation, lifecycle tracking)
+- Lab batch workflow & results entry
+- Audit logging throughout
+
+### Platform
+- Offline-first PWA (installable, works without internet)
+- IndexedDB primary storage with Supabase sync
+- Role-based access control (admin, supervisor, field collector, lab technician)
+- Project management (ODK Central-style)
+- Submission review workflow
+- AI-powered data quality analytics
+- Branding & white-label settings
+- System logs & monitoring
