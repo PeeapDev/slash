@@ -1,15 +1,19 @@
-import { query } from './database'
+import { getSupabaseClient } from './database'
 import { LogService } from './database-services'
 import { SampleDatabaseService } from './sample-database'
 
-// Sample Management Services
+// Sample Management Services — PostgREST
 export class SampleTypeService {
-  
+
   static async getAllSampleTypes() {
-    const result = await query(
-      'SELECT * FROM sample_types WHERE is_active = true ORDER BY display_name'
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('sample_types')
+      .select('*')
+      .eq('is_active', true)
+      .order('display_name')
+    if (error) throw error
+    return data || []
   }
 
   static async createSampleType(sampleTypeData: {
@@ -19,34 +23,42 @@ export class SampleTypeService {
     formSchema: any
     createdBy: string
   }) {
-    const { typeCode, displayName, description, formSchema, createdBy } = sampleTypeData
-
-    const result = await query(
-      `INSERT INTO sample_types (type_code, display_name, description, form_schema, created_by)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [typeCode, displayName, description, JSON.stringify(formSchema), createdBy]
-    )
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('sample_types')
+      .insert({
+        type_code: sampleTypeData.typeCode,
+        display_name: sampleTypeData.displayName,
+        description: sampleTypeData.description,
+        form_schema: sampleTypeData.formSchema,
+        created_by: sampleTypeData.createdBy,
+      })
+      .select()
+      .single()
+    if (error) throw error
 
     await LogService.logAction({
-      userId: createdBy,
+      userId: sampleTypeData.createdBy,
       action: 'CREATE_SAMPLE_TYPE',
       entityType: 'sample_type',
-      entityId: result.rows[0].id,
-      details: { typeCode, displayName }
+      entityId: data.id,
+      details: { typeCode: sampleTypeData.typeCode, displayName: sampleTypeData.displayName },
     })
 
-    return result.rows[0]
+    return data
   }
 }
 
 export class ProjectService {
-  
+
   static async getAllProjects() {
-    const result = await query(
-      'SELECT * FROM projects ORDER BY created_at DESC'
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('projects')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
   }
 
   static async createProject(projectData: {
@@ -61,45 +73,50 @@ export class ProjectService {
     endDate: string
     createdBy: string
   }) {
-    const {
-      projectCode, projectName, description, regionIds, districtIds,
-      expectedSampleTypes, targetSamplesCount, startDate, endDate, createdBy
-    } = projectData
-
-    const result = await query(
-      `INSERT INTO projects (project_code, project_name, description, region_ids, district_ids,
-                           expected_sample_types, target_samples_count, start_date, end_date, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-       RETURNING *`,
-      [projectCode, projectName, description, JSON.stringify(regionIds), JSON.stringify(districtIds),
-       JSON.stringify(expectedSampleTypes), targetSamplesCount, startDate, endDate, createdBy]
-    )
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('projects')
+      .insert({
+        project_code: projectData.projectCode,
+        project_name: projectData.projectName,
+        description: projectData.description,
+        region_ids: projectData.regionIds,
+        district_ids: projectData.districtIds,
+        expected_sample_types: projectData.expectedSampleTypes,
+        target_samples_count: projectData.targetSamplesCount,
+        start_date: projectData.startDate,
+        end_date: projectData.endDate,
+        created_by: projectData.createdBy,
+      })
+      .select()
+      .single()
+    if (error) throw error
 
     await LogService.logAction({
-      userId: createdBy,
+      userId: projectData.createdBy,
       action: 'CREATE_PROJECT',
       entityType: 'project',
-      entityId: result.rows[0].id,
-      details: { projectCode, projectName, targetSamplesCount }
+      entityId: data.id,
+      details: { projectCode: projectData.projectCode, projectName: projectData.projectName, targetSamplesCount: projectData.targetSamplesCount },
     })
 
-    return result.rows[0]
+    return data
   }
 
   static async getProjectById(projectId: string) {
-    const result = await query(
-      `SELECT p.*, u.full_name as created_by_name
-       FROM projects p
-       LEFT JOIN users u ON p.created_by = u.id
-       WHERE p.id = $1`,
-      [projectId]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('projects')
+      .select('*, users_profile!created_by(full_name)')
+      .eq('id', projectId)
+      .single()
+    if (error) throw error
+    return data ? { ...data, created_by_name: (data as any).users_profile?.full_name ?? null } : null
   }
 }
 
 export class SampleCollectionService {
-  
+
   static async createSample(sampleData: {
     sampleTypeCode: string
     projectId: string
@@ -112,54 +129,55 @@ export class SampleCollectionService {
     temperatureAtCollection?: number
     transportNotes?: string
   }) {
-    const {
-      sampleTypeCode, projectId, participantId, collectedBy, collectionDate,
-      collectionMetadata, volumeCollected, containerCorrect, temperatureAtCollection, transportNotes
-    } = sampleData
+    const sb = getSupabaseClient()
 
     // Generate unique sample ID
-    const sampleId = await SampleDatabaseService.generateSampleId(participantId, sampleTypeCode)
+    const sampleId = await SampleDatabaseService.generateSampleId(sampleData.participantId, sampleData.sampleTypeCode)
 
     // Get household ID from participant
-    const participantResult = await query(
-      'SELECT household_id FROM participants WHERE id = $1',
-      [participantId]
-    )
+    const { data: participant, error: pErr } = await sb
+      .from('participants')
+      .select('household_id')
+      .eq('id', sampleData.participantId)
+      .single()
 
-    if (participantResult.rows.length === 0) {
-      throw new Error('Participant not found')
-    }
+    if (pErr || !participant) throw new Error('Participant not found')
 
-    const householdId = participantResult.rows[0].household_id
-
-    const result = await query(
-      `INSERT INTO samples (
-        sample_id, sample_type_code, project_id, household_id, participant_id,
-        collected_by, collection_date, collection_metadata, volume_collected,
-        container_correct, temperature_at_collection, transport_notes, status
-       )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-       RETURNING *`,
-      [sampleId, sampleTypeCode, projectId, householdId, participantId, collectedBy,
-       collectionDate || new Date().toISOString(), JSON.stringify(collectionMetadata),
-       volumeCollected, containerCorrect !== false, temperatureAtCollection, transportNotes, 'collected']
-    )
+    const { data, error } = await sb
+      .from('samples')
+      .insert({
+        sample_id: sampleId,
+        sample_type_code: sampleData.sampleTypeCode,
+        project_id: sampleData.projectId,
+        household_id: participant.household_id,
+        participant_id: sampleData.participantId,
+        collected_by: sampleData.collectedBy,
+        collection_date: sampleData.collectionDate || new Date().toISOString(),
+        collection_metadata: sampleData.collectionMetadata,
+        volume_collected: sampleData.volumeCollected,
+        container_correct: sampleData.containerCorrect !== false,
+        temperature_at_collection: sampleData.temperatureAtCollection,
+        transport_notes: sampleData.transportNotes,
+        status: 'collected',
+      })
+      .select()
+      .single()
+    if (error) throw error
 
     // Log audit trail
-    await this.logSampleAudit(result.rows[0].id, 'SAMPLE_COLLECTED', null, 'collected', collectedBy, {
-      sampleId, sampleTypeCode, volumeCollected, collectionMetadata
+    await this.logSampleAudit(data.id, 'SAMPLE_COLLECTED', null, 'collected', sampleData.collectedBy, {
+      sampleId, sampleTypeCode: sampleData.sampleTypeCode, volumeCollected: sampleData.volumeCollected, collectionMetadata: sampleData.collectionMetadata,
     })
 
-    // Log system action
     await LogService.logAction({
-      userId: collectedBy,
+      userId: sampleData.collectedBy,
       action: 'COLLECT_SAMPLE',
       entityType: 'sample',
-      entityId: result.rows[0].id,
-      details: { sampleId, sampleTypeCode, participantId, volumeCollected }
+      entityId: data.id,
+      details: { sampleId, sampleTypeCode: sampleData.sampleTypeCode, participantId: sampleData.participantId, volumeCollected: sampleData.volumeCollected },
     })
 
-    return result.rows[0]
+    return data
   }
 
   static async getAllSamples(filters?: {
@@ -171,86 +189,89 @@ export class SampleCollectionService {
     sampleType?: string
     projectId?: string
   }) {
-    let whereClause = '1=1'
-    const params: any[] = []
+    const sb = getSupabaseClient()
+    let query = sb
+      .from('samples')
+      .select(`
+        *,
+        households!household_id(household_id, head_of_household, region, district),
+        participants!participant_id(participant_id, full_name),
+        collector:users_profile!collected_by(full_name),
+        receiver:users_profile!received_by(full_name),
+        sample_types!sample_type_code(display_name),
+        projects!project_id(project_name)
+      `)
+      .order('collection_date', { ascending: false })
 
-    // Apply role-based filtering
-    if (filters?.role === 'field_collector' && filters.userId) {
-      whereClause += ' AND s.collected_by = $' + (params.length + 1)
-      params.push(filters.userId)
-    } else if (filters?.role === 'lab_technician') {
-      whereClause += " AND s.status IN ('collected', 'in_transit', 'lab_pending', 'lab_completed')"
-    } else if (filters?.role === 'regional_head' && filters.regionId) {
-      whereClause += ' AND h.region = $' + (params.length + 1)
-      params.push(filters.regionId)
+    if (filters?.status) query = query.eq('status', filters.status)
+    if (filters?.sampleType) query = query.eq('sample_type_code', filters.sampleType)
+    if (filters?.projectId) query = query.eq('project_id', filters.projectId)
+    if (filters?.role === 'field_collector' && filters.userId) query = query.eq('collected_by', filters.userId)
+
+    const { data, error } = await query
+    if (error) throw error
+
+    let results = (data || []).map((s: any) => ({
+      ...s,
+      household_id_code: s.households?.household_id ?? null,
+      head_of_household: s.households?.head_of_household ?? null,
+      region: s.households?.region ?? null,
+      district: s.households?.district ?? null,
+      participant_id_code: s.participants?.participant_id ?? null,
+      participant_name: s.participants?.full_name ?? null,
+      collected_by_name: s.collector?.full_name ?? null,
+      received_by_name: s.receiver?.full_name ?? null,
+      sample_type_name: s.sample_types?.display_name ?? null,
+      project_name: s.projects?.project_name ?? null,
+    }))
+
+    // Client-side region/district filtering for roles that need it
+    if (filters?.role === 'regional_head' && filters.regionId) {
+      results = results.filter((s: any) => s.region === filters.regionId)
     } else if (filters?.role === 'supervisor' && filters.districtId) {
-      whereClause += ' AND h.district = $' + (params.length + 1)
-      params.push(filters.districtId)
+      results = results.filter((s: any) => s.district === filters.districtId)
+    } else if (filters?.role === 'lab_technician') {
+      results = results.filter((s: any) => ['collected', 'in_transit', 'lab_pending', 'lab_completed'].includes(s.status))
     }
 
-    // Apply additional filters
-    if (filters?.status) {
-      whereClause += ' AND s.status = $' + (params.length + 1)
-      params.push(filters.status)
-    }
-
-    if (filters?.sampleType) {
-      whereClause += ' AND s.sample_type_code = $' + (params.length + 1)
-      params.push(filters.sampleType)
-    }
-
-    if (filters?.projectId) {
-      whereClause += ' AND s.project_id = $' + (params.length + 1)
-      params.push(filters.projectId)
-    }
-
-    const result = await query(
-      `SELECT s.*, 
-              h.household_id, h.head_of_household, h.region, h.district,
-              p.participant_id, p.full_name as participant_name,
-              uc.full_name as collected_by_name,
-              ur.full_name as received_by_name,
-              st.display_name as sample_type_name,
-              pr.project_name
-       FROM samples s
-       JOIN households h ON s.household_id = h.id
-       JOIN participants p ON s.participant_id = p.id
-       LEFT JOIN users uc ON s.collected_by = uc.id
-       LEFT JOIN users ur ON s.received_by = ur.id
-       LEFT JOIN sample_types st ON s.sample_type_code = st.type_code
-       LEFT JOIN projects pr ON s.project_id = pr.id
-       WHERE ${whereClause}
-       ORDER BY s.collection_date DESC`,
-      params
-    )
-
-    return result.rows
+    return results
   }
 
   static async getSampleById(sampleId: string) {
-    const result = await query(
-      `SELECT s.*, 
-              h.household_id, h.head_of_household, h.region, h.district,
-              p.participant_id, p.full_name as participant_name,
-              uc.full_name as collected_by_name,
-              ur.full_name as received_by_name,
-              st.display_name as sample_type_name, st.form_schema,
-              pr.project_name
-       FROM samples s
-       JOIN households h ON s.household_id = h.id
-       JOIN participants p ON s.participant_id = p.id
-       LEFT JOIN users uc ON s.collected_by = uc.id
-       LEFT JOIN users ur ON s.received_by = ur.id
-       LEFT JOIN sample_types st ON s.sample_type_code = st.type_code
-       LEFT JOIN projects pr ON s.project_id = pr.id
-       WHERE s.id = $1`,
-      [sampleId]
-    )
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('samples')
+      .select(`
+        *,
+        households!household_id(household_id, head_of_household, region, district),
+        participants!participant_id(participant_id, full_name),
+        collector:users_profile!collected_by(full_name),
+        receiver:users_profile!received_by(full_name),
+        sample_types!sample_type_code(display_name, form_schema),
+        projects!project_id(project_name)
+      `)
+      .eq('id', sampleId)
+      .single()
+    if (error) throw error
+    if (!data) return null
 
-    return result.rows[0]
+    return {
+      ...data,
+      household_id_code: (data as any).households?.household_id ?? null,
+      head_of_household: (data as any).households?.head_of_household ?? null,
+      region: (data as any).households?.region ?? null,
+      district: (data as any).households?.district ?? null,
+      participant_id_code: (data as any).participants?.participant_id ?? null,
+      participant_name: (data as any).participants?.full_name ?? null,
+      collected_by_name: (data as any).collector?.full_name ?? null,
+      received_by_name: (data as any).receiver?.full_name ?? null,
+      sample_type_name: (data as any).sample_types?.display_name ?? null,
+      form_schema: (data as any).sample_types?.form_schema ?? null,
+      project_name: (data as any).projects?.project_name ?? null,
+    }
   }
 
-  static async updateSampleStatus(sampleId: string, newStatus: string, userId: string, data?: {
+  static async updateSampleStatus(sampleId: string, newStatus: string, userId: string, extraData?: {
     receivedBy?: string
     labResults?: any
     labComments?: string
@@ -258,111 +279,82 @@ export class SampleCollectionService {
     rejectionReason?: string
     rejectionNotes?: string
   }) {
-    const { receivedBy, labResults, labComments, normalRangeValidation, rejectionReason, rejectionNotes } = data || {}
+    const sb = getSupabaseClient()
 
-    // Get current sample status
-    const currentSample = await query('SELECT status FROM samples WHERE id = $1', [sampleId])
-    const oldStatus = currentSample.rows[0]?.status
+    // Get current status
+    const { data: current } = await sb.from('samples').select('status').eq('id', sampleId).single()
+    const oldStatus = current?.status
 
-    let updateFields = ['status = $2', 'updated_at = NOW()']
-    let updateValues: any[] = [sampleId, newStatus]
-    let paramIndex = 3
+    const updates: Record<string, any> = { status: newStatus, updated_at: new Date().toISOString() }
+    if (extraData?.receivedBy) updates.received_by = extraData.receivedBy
+    if (newStatus === 'lab_pending' || newStatus === 'lab_completed') updates.received_date = new Date().toISOString()
+    if (extraData?.labResults) updates.lab_results = extraData.labResults
+    if (extraData?.labComments) updates.lab_comments = extraData.labComments
+    if (extraData?.normalRangeValidation !== undefined) updates.normal_range_validation = extraData.normalRangeValidation
+    if (extraData?.rejectionReason) updates.rejection_reason = extraData.rejectionReason
+    if (extraData?.rejectionNotes) updates.rejection_notes = extraData.rejectionNotes
 
-    if (receivedBy) {
-      updateFields.push(`received_by = $${paramIndex}`)
-      updateValues.push(receivedBy)
-      paramIndex++
-    }
+    const { data, error } = await sb
+      .from('samples')
+      .update(updates)
+      .eq('id', sampleId)
+      .select()
+      .single()
+    if (error) throw error
 
-    if (newStatus === 'lab_pending' || newStatus === 'lab_completed') {
-      updateFields.push(`received_date = $${paramIndex}`)
-      updateValues.push(new Date().toISOString())
-      paramIndex++
-    }
+    await this.logSampleAudit(sampleId, 'STATUS_CHANGED', oldStatus || null, newStatus, userId, extraData)
 
-    if (labResults) {
-      updateFields.push(`lab_results = $${paramIndex}`)
-      updateValues.push(JSON.stringify(labResults))
-      paramIndex++
-    }
-
-    if (labComments) {
-      updateFields.push(`lab_comments = $${paramIndex}`)
-      updateValues.push(labComments)
-      paramIndex++
-    }
-
-    if (normalRangeValidation !== undefined) {
-      updateFields.push(`normal_range_validation = $${paramIndex}`)
-      updateValues.push(normalRangeValidation)
-      paramIndex++
-    }
-
-    if (rejectionReason) {
-      updateFields.push(`rejection_reason = $${paramIndex}`)
-      updateValues.push(rejectionReason)
-      paramIndex++
-    }
-
-    if (rejectionNotes) {
-      updateFields.push(`rejection_notes = $${paramIndex}`)
-      updateValues.push(rejectionNotes)
-      paramIndex++
-    }
-
-    const result = await query(
-      `UPDATE samples SET ${updateFields.join(', ')} WHERE id = $1 RETURNING *`,
-      updateValues
-    )
-
-    // Log audit trail
-    await this.logSampleAudit(sampleId, 'STATUS_CHANGED', oldStatus || null, newStatus, userId, data)
-
-    // Log system action
     await LogService.logAction({
       userId,
       action: `SAMPLE_STATUS_${newStatus.toUpperCase()}`,
       entityType: 'sample',
       entityId: sampleId,
-      details: { oldStatus, newStatus, ...data }
+      details: { oldStatus, newStatus, ...extraData },
     })
 
-    return result.rows[0]
+    return data
   }
 
-  static async searchSamples(searchTerm: string, filters?: any) {
-    const result = await query(
-      `SELECT s.*, 
-              h.household_id, h.head_of_household,
-              p.participant_id, p.full_name as participant_name,
-              st.display_name as sample_type_name
-       FROM samples s
-       JOIN households h ON s.household_id = h.id
-       JOIN participants p ON s.participant_id = p.id
-       LEFT JOIN sample_types st ON s.sample_type_code = st.type_code
-       WHERE s.sample_id ILIKE $1 
-          OR h.household_id ILIKE $1
-          OR p.participant_id ILIKE $1
-          OR p.full_name ILIKE $1
-       ORDER BY s.collection_date DESC
-       LIMIT 50`,
-      [`%${searchTerm}%`]
-    )
+  static async searchSamples(searchTerm: string) {
+    const sb = getSupabaseClient()
+    const term = `%${searchTerm}%`
 
-    return result.rows
+    const { data, error } = await sb
+      .from('samples')
+      .select(`
+        *,
+        households!household_id(household_id, head_of_household),
+        participants!participant_id(participant_id, full_name),
+        sample_types!sample_type_code(display_name)
+      `)
+      .or(`sample_id.ilike.${term}`)
+      .order('collection_date', { ascending: false })
+      .limit(50)
+
+    if (error) throw error
+
+    return (data || []).map((s: any) => ({
+      ...s,
+      household_id_code: s.households?.household_id ?? null,
+      head_of_household: s.households?.head_of_household ?? null,
+      participant_id_code: s.participants?.participant_id ?? null,
+      participant_name: s.participants?.full_name ?? null,
+      sample_type_name: s.sample_types?.display_name ?? null,
+    }))
   }
 
   static async getSampleAuditLog(sampleId: string) {
-    const result = await query(
-      `SELECT sal.*, u.full_name as performed_by_name
-       FROM sample_audit_log sal
-       LEFT JOIN users u ON sal.performed_by = u.id
-       WHERE sal.sample_id = $1
-       ORDER BY sal.timestamp DESC`,
-      [sampleId]
-    )
-
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('sample_audit_log')
+      .select('*, users_profile!performed_by(full_name)')
+      .eq('sample_id', sampleId)
+      .order('timestamp', { ascending: false })
+    if (error) throw error
+    return (data || []).map((a: any) => ({
+      ...a,
+      performed_by_name: a.users_profile?.full_name ?? null,
+    }))
   }
 
   private static async logSampleAudit(
@@ -373,119 +365,159 @@ export class SampleCollectionService {
     performedBy: string,
     metadata?: any
   ) {
-    await query(
-      `INSERT INTO sample_audit_log (sample_id, action, old_status, new_status, performed_by, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [sampleId, action, oldStatus, newStatus, performedBy, JSON.stringify(metadata)]
-    )
+    const sb = getSupabaseClient()
+    await sb.from('sample_audit_log').insert({
+      sample_id: sampleId,
+      action,
+      old_status: oldStatus,
+      new_status: newStatus,
+      performed_by: performedBy,
+      metadata,
+    })
   }
 }
 
 export class SampleAnalyticsService {
-  
+
   static async getDashboardStats(userId?: string, role?: string, regionId?: string, districtId?: string) {
     return await SampleDatabaseService.getSampleStatistics(userId, role, regionId, districtId)
   }
 
   static async getCollectionProgress(projectId?: string) {
-    let whereClause = '1=1'
-    const params: any[] = []
+    const sb = getSupabaseClient()
+    let query = sb
+      .from('samples')
+      .select('status, households!household_id(region, district)')
 
-    if (projectId) {
-      whereClause += ' AND s.project_id = $' + (params.length + 1)
-      params.push(projectId)
+    if (projectId) query = query.eq('project_id', projectId)
+
+    const { data, error } = await query
+    if (error) throw error
+
+    // Aggregate client-side
+    const groups: Record<string, { region: string; district: string; collected: number; total: number }> = {}
+    for (const s of (data || [])) {
+      const region = (s as any).households?.region || 'unknown'
+      const district = (s as any).households?.district || 'unknown'
+      const key = `${region}|${district}`
+      if (!groups[key]) groups[key] = { region, district, collected: 0, total: 0 }
+      groups[key].total++
+      if (s.status !== 'not_collected') groups[key].collected++
     }
 
-    const result = await query(
-      `SELECT 
-          h.region,
-          h.district,
-          COUNT(CASE WHEN s.status != 'not_collected' THEN 1 END) as collected_count,
-          COUNT(*) as total_samples,
-          ROUND(
-            COUNT(CASE WHEN s.status != 'not_collected' THEN 1 END) * 100.0 / COUNT(*), 2
-          ) as completion_percentage
-       FROM samples s
-       JOIN households h ON s.household_id = h.id
-       WHERE ${whereClause}
-       GROUP BY h.region, h.district
-       ORDER BY completion_percentage DESC`,
-      params
-    )
-
-    return result.rows
+    return Object.values(groups).map(g => ({
+      region: g.region,
+      district: g.district,
+      collected_count: g.collected,
+      total_samples: g.total,
+      completion_percentage: g.total > 0 ? Math.round(g.collected * 10000 / g.total) / 100 : 0,
+    })).sort((a, b) => b.completion_percentage - a.completion_percentage)
   }
 
   static async getLabTurnaroundStats() {
-    const result = await query(
-      `SELECT 
-          AVG(EXTRACT(EPOCH FROM (received_date - collection_date)) / 86400) as avg_collection_to_lab_days,
-          AVG(EXTRACT(EPOCH FROM (updated_at - received_date)) / 86400) as avg_lab_processing_days,
-          COUNT(CASE WHEN status = 'lab_pending' THEN 1 END) as pending_count,
-          COUNT(CASE WHEN status = 'lab_completed' THEN 1 END) as completed_count
-       FROM samples
-       WHERE status IN ('lab_pending', 'lab_completed')
-         AND received_date IS NOT NULL`
-    )
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('samples')
+      .select('status, collection_date, received_date, updated_at')
+      .in('status', ['lab_pending', 'lab_completed'])
+      .not('received_date', 'is', null)
 
-    return result.rows[0]
+    if (error) throw error
+
+    const items = data || []
+    let collectionToLabSum = 0, labProcessingSum = 0, count = 0
+
+    for (const s of items) {
+      if (s.collection_date && s.received_date) {
+        const collToLab = (new Date(s.received_date).getTime() - new Date(s.collection_date).getTime()) / 86400000
+        collectionToLabSum += collToLab
+        count++
+        if (s.updated_at && s.received_date) {
+          labProcessingSum += (new Date(s.updated_at).getTime() - new Date(s.received_date).getTime()) / 86400000
+        }
+      }
+    }
+
+    return {
+      avg_collection_to_lab_days: count > 0 ? Math.round(collectionToLabSum / count * 100) / 100 : null,
+      avg_lab_processing_days: count > 0 ? Math.round(labProcessingSum / count * 100) / 100 : null,
+      pending_count: items.filter(s => s.status === 'lab_pending').length,
+      completed_count: items.filter(s => s.status === 'lab_completed').length,
+    }
   }
 
   static async getTopCollectors(limit: number = 10) {
-    const result = await query(
-      `SELECT 
-          u.full_name,
-          u.email,
-          COUNT(s.id) as total_samples,
-          COUNT(CASE WHEN s.status = 'collected' THEN 1 END) as collected_samples,
-          AVG(s.volume_collected) as avg_volume
-       FROM users u
-       LEFT JOIN samples s ON u.id = s.collected_by
-       WHERE u.role = 'field_collector'
-       GROUP BY u.id, u.full_name, u.email
-       ORDER BY total_samples DESC
-       LIMIT $1`,
-      [limit]
-    )
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('users_profile')
+      .select('full_name, email, id')
+      .eq('role', 'field_collector')
 
-    return result.rows
+    if (error) throw error
+
+    const collectors = data || []
+    const results = []
+
+    for (const c of collectors) {
+      const { count } = await sb
+        .from('samples')
+        .select('*', { count: 'exact', head: true })
+        .eq('collected_by', c.id)
+
+      results.push({
+        full_name: c.full_name,
+        email: c.email,
+        total_samples: count || 0,
+      })
+    }
+
+    return results.sort((a, b) => b.total_samples - a.total_samples).slice(0, limit)
   }
 
   static async getAnomalies() {
-    const result = await query(
-      `SELECT 
-          s.sample_id,
-          s.sample_type_code,
-          s.status,
-          p.full_name as participant_name,
-          h.household_id,
-          s.ai_flags,
-          'Missing lab results' as anomaly_type
-       FROM samples s
-       JOIN participants p ON s.participant_id = p.id
-       JOIN households h ON s.household_id = h.id
-       WHERE s.status = 'lab_pending' 
-         AND s.received_date < NOW() - INTERVAL '7 days'
-       
-       UNION ALL
-       
-       SELECT 
-          s.sample_id,
-          s.sample_type_code,
-          s.status,
-          p.full_name as participant_name,
-          h.household_id,
-          s.ai_flags,
-          'Volume anomaly' as anomaly_type
-       FROM samples s
-       JOIN participants p ON s.participant_id = p.id
-       JOIN households h ON s.household_id = h.id
-       WHERE s.volume_collected IS NOT NULL 
-         AND (s.volume_collected < 0.5 OR s.volume_collected > 500)
-       
-       ORDER BY sample_id`
-    )
+    const sb = getSupabaseClient()
 
-    return result.rows
+    // Stale lab-pending samples
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString()
+    const { data: stale } = await sb
+      .from('samples')
+      .select('sample_id, sample_type_code, status, ai_flags, participants!participant_id(full_name), households!household_id(household_id)')
+      .eq('status', 'lab_pending')
+      .lt('received_date', sevenDaysAgo)
+
+    // Volume anomalies
+    const { data: volAnomaly } = await sb
+      .from('samples')
+      .select('sample_id, sample_type_code, status, ai_flags, volume_collected, participants!participant_id(full_name), households!household_id(household_id)')
+      .not('volume_collected', 'is', null)
+      .or('volume_collected.lt.0.5,volume_collected.gt.500')
+
+    const results: any[] = []
+
+    for (const s of (stale || [])) {
+      results.push({
+        sample_id: s.sample_id,
+        sample_type_code: s.sample_type_code,
+        status: s.status,
+        participant_name: (s as any).participants?.full_name ?? null,
+        household_id: (s as any).households?.household_id ?? null,
+        ai_flags: s.ai_flags,
+        anomaly_type: 'Missing lab results',
+      })
+    }
+
+    for (const s of (volAnomaly || [])) {
+      results.push({
+        sample_id: s.sample_id,
+        sample_type_code: s.sample_type_code,
+        status: s.status,
+        participant_name: (s as any).participants?.full_name ?? null,
+        household_id: (s as any).households?.household_id ?? null,
+        ai_flags: s.ai_flags,
+        anomaly_type: 'Volume anomaly',
+      })
+    }
+
+    return results.sort((a, b) => a.sample_id.localeCompare(b.sample_id))
   }
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { odkStore, type OdkWebUser, type OdkSiteRole } from "@/lib/odk-store"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -34,25 +33,54 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { Plus, MoreHorizontal, Pencil, Trash2, Users } from "lucide-react"
+import { Plus, MoreHorizontal, Pencil, Users, AlertCircle } from "lucide-react"
 import { format } from "date-fns"
+import { ROLE_DEFINITIONS, type TeamRole, getRoleColor } from "@/lib/team-roles"
+
+interface WebUser {
+  id: string
+  email: string
+  fullName: string
+  role: TeamRole
+  regionId?: string
+  districtId?: string
+  isActive: boolean
+  employmentStatus?: string
+  createdAt: string
+}
 
 export default function WebUsersTab() {
-  const [users, setUsers] = useState<OdkWebUser[]>([])
+  const [users, setUsers] = useState<WebUser[]>([])
   const [loading, setLoading] = useState(true)
+  const [serverAvailable, setServerAvailable] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
-  const [editUser, setEditUser] = useState<OdkWebUser | null>(null)
+  const [editUser, setEditUser] = useState<WebUser | null>(null)
 
   // Form state
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
-  const [siteRole, setSiteRole] = useState<OdkSiteRole>("none")
+  const [password, setPassword] = useState("")
+  const [role, setRole] = useState<TeamRole>("field_collector")
 
   const load = useCallback(async () => {
     setLoading(true)
-    const all = await odkStore.getWebUsers()
-    setUsers(all.sort((a, b) => b.createdAt.localeCompare(a.createdAt)))
-    setLoading(false)
+    try {
+      const response = await fetch('/api/users')
+      if (response.status === 503) {
+        setServerAvailable(false)
+        setLoading(false)
+        return
+      }
+      const data = await response.json()
+      if (data.success) {
+        setServerAvailable(true)
+        setUsers(data.data.sort((a: WebUser, b: WebUser) => b.createdAt.localeCompare(a.createdAt)))
+      }
+    } catch {
+      setServerAvailable(false)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -62,39 +90,59 @@ export default function WebUsersTab() {
   const resetForm = () => {
     setEmail("")
     setDisplayName("")
-    setSiteRole("none")
+    setPassword("")
+    setRole("field_collector")
   }
 
   const handleCreate = async () => {
-    if (!email.trim() || !displayName.trim()) return
-    await odkStore.createWebUser(email.trim(), displayName.trim(), siteRole)
-    resetForm()
-    setCreateOpen(false)
-    load()
+    if (!email.trim() || !displayName.trim() || !password.trim()) return
+
+    try {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim(),
+          fullName: displayName.trim(),
+          password: password.trim(),
+          role,
+        }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        resetForm()
+        setCreateOpen(false)
+        load()
+      }
+    } catch (e) {
+      console.error('Failed to create user:', e)
+    }
   }
 
-  const handleEdit = async () => {
-    if (!editUser || !email.trim() || !displayName.trim()) return
-    await odkStore.updateWebUser(editUser.id, {
-      email: email.trim(),
-      displayName: displayName.trim(),
-      siteRole,
-    })
-    resetForm()
-    setEditUser(null)
-    load()
-  }
-
-  const handleDelete = async (id: string) => {
-    await odkStore.deleteWebUser(id)
-    load()
-  }
-
-  const openEdit = (u: OdkWebUser) => {
+  const openEdit = (u: WebUser) => {
     setEmail(u.email)
-    setDisplayName(u.displayName)
-    setSiteRole(u.siteRole)
+    setDisplayName(u.fullName)
+    setRole(u.role)
     setEditUser(u)
+  }
+
+  const roleOptions = Object.entries(ROLE_DEFINITIONS).map(([key, def]) => ({
+    value: key as TeamRole,
+    label: def.title,
+  }))
+
+  if (!serverAvailable && !loading) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Web Users</h2>
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
+          <p className="text-sm text-muted-foreground">
+            Supabase not configured. User management requires a cloud connection.
+          </p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -129,7 +177,8 @@ export default function WebUsersTab() {
               <TableRow>
                 <TableHead>Display Name</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead className="w-32">Site-wide Role</TableHead>
+                <TableHead className="w-40">Role</TableHead>
+                <TableHead className="hidden md:table-cell w-24">Status</TableHead>
                 <TableHead className="hidden md:table-cell w-32">Created</TableHead>
                 <TableHead className="w-16" />
               </TableRow>
@@ -137,15 +186,21 @@ export default function WebUsersTab() {
             <TableBody>
               {users.map((u) => (
                 <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.displayName}</TableCell>
+                  <TableCell className="font-medium">{u.fullName}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>
                   <TableCell>
-                    <Badge variant={u.siteRole === "admin" ? "default" : "secondary"}>
-                      {u.siteRole === "admin" ? "Admin" : "None"}
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-2 h-2 rounded-full ${getRoleColor(u.role)}`} />
+                      <span className="text-sm">{ROLE_DEFINITIONS[u.role]?.title || u.role}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <Badge variant={u.isActive ? "default" : "secondary"}>
+                      {u.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </TableCell>
                   <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                    {format(new Date(u.createdAt), "MMM d, yyyy")}
+                    {u.createdAt ? format(new Date(u.createdAt), "MMM d, yyyy") : '-'}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
@@ -157,14 +212,7 @@ export default function WebUsersTab() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => openEdit(u)}>
                           <Pencil className="mr-2 h-4 w-4" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDelete(u.id)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          Retire
+                          View Details
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -201,14 +249,24 @@ export default function WebUsersTab() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Site-wide Role</Label>
-              <Select value={siteRole} onValueChange={(v) => setSiteRole(v as OdkSiteRole)}>
+              <Label>Password *</Label>
+              <Input
+                type="password"
+                placeholder="Minimum 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Role</Label>
+              <Select value={role} onValueChange={(v) => setRole(v as TeamRole)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="admin">Administrator</SelectItem>
+                  {roleOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -219,7 +277,7 @@ export default function WebUsersTab() {
             </Button>
             <Button
               onClick={handleCreate}
-              disabled={!email.trim() || !displayName.trim()}
+              disabled={!email.trim() || !displayName.trim() || !password.trim()}
             >
               Create
             </Button>
@@ -227,50 +285,30 @@ export default function WebUsersTab() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* View Details Dialog */}
       <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Web User</DialogTitle>
+            <DialogTitle>User Details</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Display Name *</Label>
-              <Input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-              />
+          {editUser && (
+            <div className="space-y-3 py-2 text-sm">
+              <div><span className="font-medium">Name:</span> {editUser.fullName}</div>
+              <div><span className="font-medium">Email:</span> {editUser.email}</div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">Role:</span>
+                <div className={`w-2 h-2 rounded-full ${getRoleColor(editUser.role)}`} />
+                {ROLE_DEFINITIONS[editUser.role]?.title || editUser.role}
+              </div>
+              <div><span className="font-medium">Status:</span> {editUser.isActive ? 'Active' : 'Inactive'}</div>
+              {editUser.regionId && <div><span className="font-medium">Region:</span> {editUser.regionId}</div>}
+              {editUser.districtId && <div><span className="font-medium">District:</span> {editUser.districtId}</div>}
+              <div><span className="font-medium">Created:</span> {editUser.createdAt ? format(new Date(editUser.createdAt), "PPP") : '-'}</div>
             </div>
-            <div className="space-y-2">
-              <Label>Email *</Label>
-              <Input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Site-wide Role</Label>
-              <Select value={siteRole} onValueChange={(v) => setSiteRole(v as OdkSiteRole)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="admin">Administrator</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUser(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleEdit}
-              disabled={!email.trim() || !displayName.trim()}
-            >
-              Save
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

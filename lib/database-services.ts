@@ -1,48 +1,38 @@
-import { query } from './database'
+import { getSupabaseClient } from './database'
 
-// User Management Service
+// User Management Service — reads/writes users_profile via PostgREST
 export class UserService {
-  static async createUser(userData: {
-    email: string
-    passwordHash: string
-    fullName: string
-    role: string
-    regionId?: string
-    districtId?: string
-  }) {
-    const { email, passwordHash, fullName, role, regionId, districtId } = userData
-    
-    const result = await query(
-      `INSERT INTO users (email, password_hash, full_name, role, region_id, district_id)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, email, full_name, role, region_id, district_id, created_at`,
-      [email, passwordHash, fullName, role, regionId, districtId]
-    )
-    
-    return result.rows[0]
-  }
-
   static async getUserByEmail(email: string) {
-    const result = await query(
-      'SELECT * FROM users WHERE email = $1 AND is_active = true',
-      [email]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('users_profile')
+      .select('*')
+      .eq('email', email)
+      .eq('is_active', true)
+      .single()
+    if (error && error.code !== 'PGRST116') throw error // PGRST116 = no rows
+    return data
   }
 
   static async getUserById(id: string) {
-    const result = await query(
-      'SELECT id, email, full_name, role, region_id, district_id, is_active, created_at FROM users WHERE id = $1',
-      [id]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('users_profile')
+      .select('id, email, full_name, role, region_id, district_id, is_active, employment_status, created_at')
+      .eq('id', id)
+      .single()
+    if (error && error.code !== 'PGRST116') throw error
+    return data
   }
 
   static async getAllUsers() {
-    const result = await query(
-      'SELECT id, email, full_name, role, region_id, district_id, is_active, created_at FROM users ORDER BY created_at DESC'
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('users_profile')
+      .select('id, email, full_name, role, region_id, district_id, is_active, employment_status, created_at')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
   }
 
   static async updateUser(id: string, updates: Partial<{
@@ -52,19 +42,27 @@ export class UserService {
     regionId: string
     districtId: string
     isActive: boolean
+    employmentStatus: string
   }>) {
-    const setClause = Object.keys(updates).map((key, index) => 
-      `${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)} = $${index + 2}`
-    ).join(', ')
-    
-    const values = [id, ...Object.values(updates)]
-    
-    const result = await query(
-      `UPDATE users SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`,
-      values
-    )
-    
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    // Map camelCase to snake_case
+    const mapped: Record<string, any> = { updated_at: new Date().toISOString() }
+    if (updates.email !== undefined) mapped.email = updates.email
+    if (updates.fullName !== undefined) mapped.full_name = updates.fullName
+    if (updates.role !== undefined) mapped.role = updates.role
+    if (updates.regionId !== undefined) mapped.region_id = updates.regionId
+    if (updates.districtId !== undefined) mapped.district_id = updates.districtId
+    if (updates.isActive !== undefined) mapped.is_active = updates.isActive
+    if (updates.employmentStatus !== undefined) mapped.employment_status = updates.employmentStatus
+
+    const { data, error } = await sb
+      .from('users_profile')
+      .update(mapped)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 }
 
@@ -83,66 +81,81 @@ export class HouseholdService {
     totalMembers?: number
     createdBy: string
   }) {
-    const {
-      householdId, headOfHousehold, address, region, district,
-      chiefdom, section, gpsCoordinates, phoneNumber, totalMembers, createdBy
-    } = householdData
-
-    const result = await query(
-      `INSERT INTO households (household_id, head_of_household, address, region, district, 
-                             chiefdom, section, gps_coordinates, phone_number, total_members, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-       RETURNING *`,
-      [householdId, headOfHousehold, address, region, district, chiefdom, section, 
-       gpsCoordinates, phoneNumber, totalMembers || 0, createdBy]
-    )
-
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('households')
+      .insert({
+        household_id: householdData.householdId,
+        head_of_household: householdData.headOfHousehold,
+        address: householdData.address,
+        region: householdData.region,
+        district: householdData.district,
+        chiefdom: householdData.chiefdom,
+        section: householdData.section,
+        gps_coordinates: householdData.gpsCoordinates,
+        phone_number: householdData.phoneNumber,
+        total_members: householdData.totalMembers || 0,
+        created_by: householdData.createdBy,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 
   static async getAllHouseholds() {
-    const result = await query(
-      `SELECT h.*, u.full_name as created_by_name 
-       FROM households h 
-       LEFT JOIN users u ON h.created_by = u.id 
-       ORDER BY h.created_at DESC`
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('households')
+      .select('*, users_profile!created_by(full_name)')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data || []).map((h: any) => ({
+      ...h,
+      created_by_name: h.users_profile?.full_name ?? null,
+    }))
   }
 
   static async getHouseholdById(id: string) {
-    const result = await query(
-      `SELECT h.*, u.full_name as created_by_name,
-       (SELECT COUNT(*) FROM participants WHERE household_id = h.id) as participant_count
-       FROM households h 
-       LEFT JOIN users u ON h.created_by = u.id 
-       WHERE h.id = $1`,
-      [id]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('households')
+      .select('*, users_profile!created_by(full_name), participants(count)')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data ? {
+      ...data,
+      created_by_name: data.users_profile?.full_name ?? null,
+      participant_count: data.participants?.[0]?.count ?? 0,
+    } : null
   }
 
   static async getHouseholdsByRegion(region: string) {
-    const result = await query(
-      'SELECT * FROM households WHERE region = $1 ORDER BY created_at DESC',
-      [region]
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('households')
+      .select('*')
+      .eq('region', region)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
   }
 
   static async updateHousehold(id: string, updates: any) {
-    const setClause = Object.keys(updates).map((key, index) => 
-      `${key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)} = $${index + 2}`
-    ).join(', ')
-    
-    const values = [id, ...Object.values(updates)]
-    
-    const result = await query(
-      `UPDATE households SET ${setClause}, updated_at = NOW() WHERE id = $1 RETURNING *`,
-      values
-    )
-    
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const mapped: Record<string, any> = { updated_at: new Date().toISOString() }
+    for (const [key, value] of Object.entries(updates)) {
+      mapped[key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`)] = value
+    }
+    const { data, error } = await sb
+      .from('households')
+      .update(mapped)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 }
 
@@ -162,64 +175,83 @@ export class ParticipantService {
     riskLevel?: string
     createdBy: string
   }) {
-    const {
-      participantId, householdId, fullName, dateOfBirth, gender,
-      relationshipToHead, phoneNumber, educationLevel, occupation,
-      healthStatus, riskLevel, createdBy
-    } = participantData
-
-    const result = await query(
-      `INSERT INTO participants (participant_id, household_id, full_name, date_of_birth, 
-                               gender, relationship_to_head, phone_number, education_level, 
-                               occupation, health_status, risk_level, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-       RETURNING *`,
-      [participantId, householdId, fullName, dateOfBirth, gender, relationshipToHead,
-       phoneNumber, educationLevel, occupation, healthStatus || 'unknown', 
-       riskLevel || 'low', createdBy]
-    )
-
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('participants')
+      .insert({
+        participant_id: participantData.participantId,
+        household_id: participantData.householdId,
+        full_name: participantData.fullName,
+        date_of_birth: participantData.dateOfBirth,
+        gender: participantData.gender,
+        relationship_to_head: participantData.relationshipToHead,
+        phone_number: participantData.phoneNumber,
+        education_level: participantData.educationLevel,
+        occupation: participantData.occupation,
+        health_status: participantData.healthStatus || 'unknown',
+        risk_level: participantData.riskLevel || 'low',
+        created_by: participantData.createdBy,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 
   static async getAllParticipants() {
-    const result = await query(
-      `SELECT p.*, h.household_id, h.head_of_household, u.full_name as created_by_name
-       FROM participants p 
-       LEFT JOIN households h ON p.household_id = h.id
-       LEFT JOIN users u ON p.created_by = u.id 
-       ORDER BY p.created_at DESC`
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('participants')
+      .select('*, households!household_id(household_id, head_of_household), users_profile!created_by(full_name)')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data || []).map((p: any) => ({
+      ...p,
+      household_id_code: p.households?.household_id ?? null,
+      head_of_household: p.households?.head_of_household ?? null,
+      created_by_name: p.users_profile?.full_name ?? null,
+    }))
   }
 
   static async getParticipantsByHousehold(householdId: string) {
-    const result = await query(
-      'SELECT * FROM participants WHERE household_id = $1 ORDER BY created_at ASC',
-      [householdId]
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('participants')
+      .select('*')
+      .eq('household_id', householdId)
+      .order('created_at', { ascending: true })
+    if (error) throw error
+    return data || []
   }
 
   static async getParticipantById(id: string) {
-    const result = await query(
-      `SELECT p.*, h.household_id, h.head_of_household, h.address
-       FROM participants p 
-       LEFT JOIN households h ON p.household_id = h.id
-       WHERE p.id = $1`,
-      [id]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('participants')
+      .select('*, households!household_id(household_id, head_of_household, address)')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data ? {
+      ...data,
+      household_id_code: data.households?.household_id ?? null,
+      head_of_household: data.households?.head_of_household ?? null,
+      address: data.households?.address ?? null,
+    } : null
   }
 
   static async updateParticipantRiskLevel(id: string, riskLevel: string, healthStatus?: string) {
-    const result = await query(
-      `UPDATE participants 
-       SET risk_level = $1, health_status = COALESCE($2, health_status), updated_at = NOW() 
-       WHERE id = $3 RETURNING *`,
-      [riskLevel, healthStatus, id]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const updates: Record<string, any> = { risk_level: riskLevel, updated_at: new Date().toISOString() }
+    if (healthStatus) updates.health_status = healthStatus
+    const { data, error } = await sb
+      .from('participants')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 }
 
@@ -236,58 +268,69 @@ export class SampleService {
     transportMethod?: string
     notes?: string
   }) {
-    const {
-      sampleId, participantId, collectorId, sampleType, collectionDate,
-      collectionSite, storageConditions, transportMethod, notes
-    } = sampleData
-
-    const result = await query(
-      `INSERT INTO sample_collections (sample_id, participant_id, collector_id, sample_type,
-                                     collection_date, collection_site, storage_conditions,
-                                     transport_method, notes)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [sampleId, participantId, collectorId, sampleType, collectionDate,
-       collectionSite, storageConditions, transportMethod, notes]
-    )
-
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('sample_collections')
+      .insert({
+        sample_id: sampleData.sampleId,
+        participant_id: sampleData.participantId,
+        collector_id: sampleData.collectorId,
+        sample_type: sampleData.sampleType,
+        collection_date: sampleData.collectionDate,
+        collection_site: sampleData.collectionSite,
+        storage_conditions: sampleData.storageConditions,
+        transport_method: sampleData.transportMethod,
+        notes: sampleData.notes,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 
   static async getAllSamples() {
-    const result = await query(
-      `SELECT s.*, p.full_name as participant_name, p.participant_id,
-              u.full_name as collector_name
-       FROM sample_collections s
-       LEFT JOIN participants p ON s.participant_id = p.id
-       LEFT JOIN users u ON s.collector_id = u.id
-       ORDER BY s.collection_date DESC`
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('sample_collections')
+      .select('*, participants!participant_id(full_name, participant_id), users_profile!collector_id(full_name)')
+      .order('collection_date', { ascending: false })
+    if (error) throw error
+    return (data || []).map((s: any) => ({
+      ...s,
+      participant_name: s.participants?.full_name ?? null,
+      participant_id_code: s.participants?.participant_id ?? null,
+      collector_name: s.users_profile?.full_name ?? null,
+    }))
   }
 
   static async getSamplesByStatus(status: string) {
-    const result = await query(
-      `SELECT s.*, p.full_name as participant_name, p.participant_id,
-              u.full_name as collector_name
-       FROM sample_collections s
-       LEFT JOIN participants p ON s.participant_id = p.id
-       LEFT JOIN users u ON s.collector_id = u.id
-       WHERE s.status = $1
-       ORDER BY s.collection_date DESC`,
-      [status]
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('sample_collections')
+      .select('*, participants!participant_id(full_name, participant_id), users_profile!collector_id(full_name)')
+      .eq('status', status)
+      .order('collection_date', { ascending: false })
+    if (error) throw error
+    return (data || []).map((s: any) => ({
+      ...s,
+      participant_name: s.participants?.full_name ?? null,
+      participant_id_code: s.participants?.participant_id ?? null,
+      collector_name: s.users_profile?.full_name ?? null,
+    }))
   }
 
   static async updateSampleStatus(id: string, status: string, labDeliveryDate?: string) {
-    const result = await query(
-      `UPDATE sample_collections 
-       SET status = $1, lab_delivery_date = $2, updated_at = NOW() 
-       WHERE id = $3 RETURNING *`,
-      [status, labDeliveryDate, id]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const updates: Record<string, any> = { status, updated_at: new Date().toISOString() }
+    if (labDeliveryDate) updates.lab_delivery_date = labDeliveryDate
+    const { data, error } = await sb
+      .from('sample_collections')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 }
 
@@ -300,49 +343,68 @@ export class SurveyService {
     surveyData: any
     completionStatus?: string
   }) {
-    const { formId, participantId, collectorId, surveyData, completionStatus } = surveyInput
-
-    const result = await query(
-      `INSERT INTO surveys (form_id, participant_id, collector_id, survey_data, completion_status)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [formId, participantId, collectorId, JSON.stringify(surveyData), completionStatus || 'draft']
-    )
-
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('surveys')
+      .insert({
+        form_id: surveyInput.formId,
+        participant_id: surveyInput.participantId,
+        collector_id: surveyInput.collectorId,
+        survey_data: surveyInput.surveyData,
+        completion_status: surveyInput.completionStatus || 'draft',
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 
   static async getAllSurveys() {
-    const result = await query(
-      `SELECT s.*, p.full_name as participant_name, p.participant_id,
-              u.full_name as collector_name, f.title as form_title
-       FROM surveys s
-       LEFT JOIN participants p ON s.participant_id = p.id
-       LEFT JOIN users u ON s.collector_id = u.id
-       LEFT JOIN forms f ON s.form_id = f.form_id
-       ORDER BY s.created_at DESC`
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('surveys')
+      .select('*, participants!participant_id(full_name, participant_id), users_profile!collector_id(full_name), forms!form_id(title)')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data || []).map((s: any) => ({
+      ...s,
+      participant_name: s.participants?.full_name ?? null,
+      participant_id_code: s.participants?.participant_id ?? null,
+      collector_name: s.users_profile?.full_name ?? null,
+      form_title: s.forms?.title ?? null,
+    }))
   }
 
   static async submitSurvey(id: string) {
-    const result = await query(
-      `UPDATE surveys 
-       SET completion_status = 'submitted', submitted_at = NOW(), updated_at = NOW() 
-       WHERE id = $1 RETURNING *`,
-      [id]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('surveys')
+      .update({
+        completion_status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 
   static async updateAIValidation(id: string, validationStatus: string, flags?: any) {
-    const result = await query(
-      `UPDATE surveys 
-       SET ai_validation_status = $1, ai_flags = $2, updated_at = NOW() 
-       WHERE id = $3 RETURNING *`,
-      [validationStatus, JSON.stringify(flags), id]
-    )
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('surveys')
+      .update({
+        ai_validation_status: validationStatus,
+        ai_flags: flags,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 }
 
@@ -359,42 +421,48 @@ export class AIAnalysisService {
     flags?: any
     recommendations?: string
   }) {
-    const {
-      entityType, entityId, analysisType, provider, inputData,
-      analysisResult, confidenceScore, flags, recommendations
-    } = analysisData
-
-    const result = await query(
-      `INSERT INTO ai_analysis (entity_type, entity_id, analysis_type, provider, 
-                              input_data, analysis_result, confidence_score, flags, recommendations)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-       RETURNING *`,
-      [entityType, entityId, analysisType, provider, JSON.stringify(inputData),
-       JSON.stringify(analysisResult), confidenceScore, JSON.stringify(flags), recommendations]
-    )
-
-    return result.rows[0]
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('ai_analysis')
+      .insert({
+        entity_type: analysisData.entityType,
+        entity_id: analysisData.entityId,
+        analysis_type: analysisData.analysisType,
+        provider: analysisData.provider,
+        input_data: analysisData.inputData,
+        analysis_result: analysisData.analysisResult,
+        confidence_score: analysisData.confidenceScore,
+        flags: analysisData.flags,
+        recommendations: analysisData.recommendations,
+      })
+      .select()
+      .single()
+    if (error) throw error
+    return data
   }
 
   static async getAnalysisByEntity(entityType: string, entityId: string) {
-    const result = await query(
-      `SELECT * FROM ai_analysis 
-       WHERE entity_type = $1 AND entity_id = $2 
-       ORDER BY created_at DESC`,
-      [entityType, entityId]
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('ai_analysis')
+      .select('*')
+      .eq('entity_type', entityType)
+      .eq('entity_id', entityId)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return data || []
   }
 
   static async getLatestAnalysis(analysisType: string, limit: number = 50) {
-    const result = await query(
-      `SELECT * FROM ai_analysis 
-       WHERE analysis_type = $1 
-       ORDER BY created_at DESC 
-       LIMIT $2`,
-      [analysisType, limit]
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('ai_analysis')
+      .select('*')
+      .eq('analysis_type', analysisType)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return data || []
   }
 }
 
@@ -409,38 +477,54 @@ export class LogService {
     ipAddress?: string
     userAgent?: string
   }) {
-    const { userId, action, entityType, entityId, details, ipAddress, userAgent } = logData
-
-    const result = await query(
-      `INSERT INTO system_logs (user_id, action, entity_type, entity_id, details, ip_address, user_agent)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [userId, action, entityType, entityId, JSON.stringify(details), ipAddress, userAgent]
-    )
-
-    return result.rows[0]
+    try {
+      const sb = getSupabaseClient()
+      const { data, error } = await sb
+        .from('system_logs')
+        .insert({
+          user_id: logData.userId,
+          action: logData.action,
+          entity_type: logData.entityType,
+          entity_id: logData.entityId,
+          details: logData.details,
+          ip_address: logData.ipAddress,
+          user_agent: logData.userAgent,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    } catch (e) {
+      // Logging should never break the caller
+      console.warn('LogService.logAction failed:', e)
+      return null
+    }
   }
 
   static async getSystemLogs(limit: number = 100) {
-    const result = await query(
-      `SELECT l.*, u.full_name as user_name, u.email as user_email
-       FROM system_logs l
-       LEFT JOIN users u ON l.user_id = u.id
-       ORDER BY l.created_at DESC
-       LIMIT $1`,
-      [limit]
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('system_logs')
+      .select('*, users_profile!user_id(full_name, email)')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return (data || []).map((l: any) => ({
+      ...l,
+      user_name: l.users_profile?.full_name ?? null,
+      user_email: l.users_profile?.email ?? null,
+    }))
   }
 
   static async getLogsByUser(userId: string, limit: number = 50) {
-    const result = await query(
-      `SELECT * FROM system_logs 
-       WHERE user_id = $1 
-       ORDER BY created_at DESC 
-       LIMIT $2`,
-      [userId, limit]
-    )
-    return result.rows
+    const sb = getSupabaseClient()
+    const { data, error } = await sb
+      .from('system_logs')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return data || []
   }
 }

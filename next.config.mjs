@@ -7,16 +7,14 @@ const nextConfig = {
     unoptimized: true,
   },
 
-  // Exclude server-only packages from client bundle
-  serverExternalPackages: ['pg', 'pg-hstore'],
-
   // PWA Configuration - Turbopack compatible
   experimental: {
     webpackBuildWorker: true,
   },
-  
+
   // Empty turbopack config to silence warnings
   turbopack: {},
+
   
   // Headers for PWA security and functionality
   async headers() {

@@ -4,38 +4,40 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { 
-  CheckCircle, 
-  XCircle, 
-  Database, 
+import {
+  CheckCircle,
+  XCircle,
+  Database,
   Loader2,
   AlertTriangle,
-  Zap
+  Zap,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 
 interface DatabaseHealth {
-  neon: boolean
   supabase: boolean
+  indexedDB: boolean
   timestamp: string
+  supabaseError?: string
 }
 
 export default function DatabaseSetup() {
   const [health, setHealth] = useState<DatabaseHealth | null>(null)
+  const [configured, setConfigured] = useState<boolean | null>(null)
   const [isChecking, setIsChecking] = useState(false)
-  const [isInitializing, setIsInitializing] = useState(false)
-  const [initStatus, setInitStatus] = useState<string | null>(null)
+  const [showSetupHelp, setShowSetupHelp] = useState(false)
 
   const checkDatabaseHealth = async () => {
     setIsChecking(true)
     try {
       const response = await fetch('/api/database/init')
       const data = await response.json()
-      
-      if (data.success) {
+
+      if (data.health) {
         setHealth(data.health)
-      } else {
-        console.error('Database health check failed:', data.error)
       }
+      setConfigured(data.configured ?? false)
     } catch (error) {
       console.error('Error checking database health:', error)
     } finally {
@@ -43,41 +45,18 @@ export default function DatabaseSetup() {
     }
   }
 
-  const initializeDatabase = async () => {
-    setIsInitializing(true)
-    setInitStatus('Initializing database tables...')
-    
-    try {
-      const response = await fetch('/api/database/init', {
-        method: 'POST'
-      })
-      const data = await response.json()
-      
-      if (data.success) {
-        setInitStatus('Database initialized successfully! ✅')
-        // Refresh health check
-        setTimeout(() => checkDatabaseHealth(), 1000)
-      } else {
-        setInitStatus(`Initialization failed: ${data.error}`)
-      }
-    } catch (error) {
-      setInitStatus(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    } finally {
-      setIsInitializing(false)
-    }
-  }
-
   useEffect(() => {
     checkDatabaseHealth()
   }, [])
 
-  const renderConnectionStatus = (name: string, status: boolean, description: string) => (
+  const renderConnectionStatus = (name: string, status: boolean, description: string, errorMsg?: string) => (
     <div className="flex items-center justify-between p-4 border rounded-lg">
       <div className="flex items-center gap-3">
         <Database className="w-5 h-5" />
         <div>
           <h3 className="font-semibold">{name}</h3>
           <p className="text-sm text-muted-foreground">{description}</p>
+          {errorMsg && <p className="text-xs text-red-500 mt-1">{errorMsg}</p>}
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -101,17 +80,53 @@ export default function DatabaseSetup() {
       <div className="space-y-6">
         <div className="flex items-center gap-2">
           <Database className="w-6 h-6" />
-          <h2 className="text-2xl font-bold">Database Setup & Health</h2>
+          <h2 className="text-2xl font-bold">Database Health</h2>
         </div>
+
+        {configured === false && (
+          <div className="p-4 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm space-y-2">
+            <div className="flex items-center gap-2 font-semibold">
+              <AlertTriangle className="w-4 h-4" />
+              Supabase not configured
+            </div>
+            <p>
+              The app is running in offline-only mode (IndexedDB). To enable cloud sync,
+              user management, and authentication, add Supabase environment variables.
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSetupHelp(!showSetupHelp)}
+              className="text-amber-700"
+            >
+              {showSetupHelp ? <ChevronUp className="w-4 h-4 mr-1" /> : <ChevronDown className="w-4 h-4 mr-1" />}
+              {showSetupHelp ? 'Hide' : 'Show'} setup instructions
+            </Button>
+            {showSetupHelp && (
+              <div className="mt-2 p-3 bg-white rounded border border-amber-100 text-xs space-y-2 font-mono">
+                <p className="font-sans font-semibold text-sm">Required environment variables:</p>
+                <div className="space-y-1">
+                  <p><span className="text-blue-600">NEXT_PUBLIC_SUPABASE_URL</span> = https://xxx.supabase.co</p>
+                  <p><span className="text-blue-600">NEXT_PUBLIC_SUPABASE_ANON_KEY</span> = eyJ...</p>
+                </div>
+                <p className="font-sans text-xs text-muted-foreground mt-2">
+                  1. Create a project at supabase.com<br />
+                  2. Run the migration SQL in the SQL Editor<br />
+                  3. Add these variables in Vercel Dashboard or .env.local
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Database Health Status */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold">Connection Status</h3>
-            <Button 
-              onClick={checkDatabaseHealth} 
+            <Button
+              onClick={checkDatabaseHealth}
               disabled={isChecking}
-              variant="outline" 
+              variant="outline"
               size="sm"
             >
               {isChecking ? (
@@ -126,14 +141,15 @@ export default function DatabaseSetup() {
           {health ? (
             <div className="space-y-3">
               {renderConnectionStatus(
-                "Neon PostgreSQL",
-                health.neon,
-                "Primary database for application data"
-              )}
-              {renderConnectionStatus(
                 "Supabase",
                 health.supabase,
-                "Authentication and real-time features"
+                "Cloud database, authentication, and sync server",
+                health.supabaseError
+              )}
+              {renderConnectionStatus(
+                "IndexedDB",
+                health.indexedDB,
+                "Offline-first local storage (always available)"
               )}
               <div className="text-xs text-muted-foreground">
                 Last checked: {new Date(health.timestamp).toLocaleString()}
@@ -147,87 +163,20 @@ export default function DatabaseSetup() {
           )}
         </div>
 
-        {/* Database Initialization */}
-        <div className="space-y-4 pt-4 border-t">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-amber-500" />
-            <h3 className="text-lg font-semibold">Database Initialization</h3>
-          </div>
-          
-          <p className="text-sm text-muted-foreground">
-            Initialize the database with required tables and indexes for the SLASH platform.
-            This will create tables for users, households, participants, samples, surveys, and more.
-          </p>
-
-          <Button 
-            onClick={initializeDatabase}
-            disabled={isInitializing || !health?.neon}
-            className="w-full"
-          >
-            {isInitializing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Initializing Database...
-              </>
-            ) : (
-              <>
-                <Database className="w-4 h-4 mr-2" />
-                Initialize Database Tables
-              </>
-            )}
-          </Button>
-
-          {initStatus && (
-            <div className={`p-3 rounded-lg text-sm ${
-              initStatus.includes('✅') 
-                ? 'bg-green-50 text-green-700 border border-green-200' 
-                : initStatus.includes('failed') || initStatus.includes('Error')
-                ? 'bg-red-50 text-red-700 border border-red-200'
-                : 'bg-blue-50 text-blue-700 border border-blue-200'
-            }`}>
-              {initStatus}
-            </div>
-          )}
-        </div>
-
         {/* Database Schema Info */}
         <div className="space-y-4 pt-4 border-t">
           <h3 className="text-lg font-semibold">Database Schema</h3>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
             {[
-              'users', 'households', 'participants', 'sample_collections',
-              'lab_results', 'surveys', 'forms', 'ai_analysis', 'system_logs'
+              'users_profile', 'households', 'participants', 'sample_collections',
+              'samples', 'lab_results', 'surveys', 'forms', 'ai_analysis',
+              'system_logs', 'sample_types', 'projects'
             ].map((table) => (
               <div key={table} className="flex items-center gap-2 p-2 bg-muted rounded">
                 <Database className="w-4 h-4" />
-                <span className="font-mono">{table}</span>
+                <span className="font-mono text-xs">{table}</span>
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* Connection Details */}
-        <div className="space-y-4 pt-4 border-t">
-          <h3 className="text-lg font-semibold">Configuration</h3>
-          <div className="grid gap-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Database URL:</span>
-              <span className="font-mono text-xs">
-                {process.env.NEXT_PUBLIC_DATABASE_URL ? '✅ Configured' : '❌ Not set'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Supabase URL:</span>
-              <span className="font-mono text-xs">
-                {process.env.NEXT_PUBLIC_SUPABASE_URL ? '✅ Configured' : '❌ Not set'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Environment:</span>
-              <span className="font-mono text-xs">
-                {process.env.NODE_ENV || 'development'}
-              </span>
-            </div>
           </div>
         </div>
       </div>

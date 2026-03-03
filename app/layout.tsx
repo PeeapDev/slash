@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { ThemeProvider } from "@/lib/theme-context"
+import { AuthProvider } from "@/lib/auth-context"
 import DevCleanup from "@/components/dev-cleanup"
 import SyncInitializer from "@/components/sync-initializer"
 import DynamicFavicon from "@/components/dynamic-favicon"
@@ -57,10 +58,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
         <ThemeProvider>
-          <DevCleanup />
-          <SyncInitializer />
-          <DynamicFavicon />
-          {children}
+          <AuthProvider>
+            <DevCleanup />
+            <SyncInitializer />
+            <DynamicFavicon />
+            {children}
+          </AuthProvider>
         </ThemeProvider>
         <Analytics />
       </body>
