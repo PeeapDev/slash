@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import LoginPage from "@/components/login-page"
 import OdkLayout from "@/components/odk-layout"
@@ -9,7 +8,6 @@ import { indexedDBService } from "@/lib/indexdb-service"
 
 export default function Home() {
   const { user, isAuthenticated, isLoading, supabaseConfigured, logout } = useAuth()
-  const router = useRouter()
 
   // Supabase not configured → offline mode with IndexedDB local auth
   if (!supabaseConfigured) {
@@ -27,14 +25,14 @@ export default function Home() {
     )
   }
 
-  // Supabase configured but not authenticated → redirect to login page
+  // Not authenticated → show login (middleware also guards, but this handles client-side)
   if (!isAuthenticated) {
-    router.replace("/login")
+    if (typeof window !== "undefined") window.location.href = "/login"
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Redirecting to login...</p>
+          <p className="mt-4 text-muted-foreground">Loading...</p>
         </div>
       </div>
     )
@@ -45,7 +43,7 @@ export default function Home() {
     try {
       await indexedDBService.delete('app_settings', 'current_user')
     } catch { /* ignore */ }
-    router.push("/login")
+    window.location.href = "/login"
   }
 
   return (

@@ -12,7 +12,7 @@ import { Activity, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 
 export default function LoginForm() {
-  const { login, supabaseConfigured } = useAuth()
+  const { login, isAuthenticated, supabaseConfigured } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") || "/"
@@ -25,7 +25,13 @@ export default function LoginForm() {
 
   // If Supabase not configured, redirect to home (offline mode handles auth there)
   if (!supabaseConfigured) {
-    router.replace("/")
+    if (typeof window !== "undefined") window.location.href = "/"
+    return null
+  }
+
+  // Already authenticated → go to dashboard
+  if (isAuthenticated) {
+    if (typeof window !== "undefined") window.location.href = redirect
     return null
   }
 
@@ -37,7 +43,8 @@ export default function LoginForm() {
     try {
       const result = await login(email, password)
       if (result.success) {
-        router.push(redirect)
+        // Full page reload so middleware picks up the new auth cookies
+        window.location.href = redirect
       } else {
         setError(result.error || "Login failed")
       }

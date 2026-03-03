@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
-import { createClient, type SupabaseClient, type Session } from '@supabase/supabase-js'
+import { createBrowserClient } from '@supabase/ssr'
+import type { SupabaseClient, Session } from '@supabase/supabase-js'
 import {
   type TeamRole,
   type RolePermissions,
@@ -10,7 +11,8 @@ import {
   canManageRole as checkCanManageRole,
 } from './team-roles'
 
-// Client-side Supabase client (singleton)
+// Client-side Supabase client (singleton) — uses @supabase/ssr for cookie-based sessions
+// This ensures the middleware (which also reads cookies) stays in sync
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 const isConfigured = supabaseUrl.length > 0 && !supabaseUrl.includes('placeholder') && supabaseAnonKey.length > 0
@@ -18,8 +20,9 @@ const isConfigured = supabaseUrl.length > 0 && !supabaseUrl.includes('placeholde
 let clientSingleton: SupabaseClient | null = null
 function getClientSupabase(): SupabaseClient | null {
   if (!isConfigured) return null
+  if (typeof window === 'undefined') return null
   if (!clientSingleton) {
-    clientSingleton = createClient(supabaseUrl, supabaseAnonKey)
+    clientSingleton = createBrowserClient(supabaseUrl, supabaseAnonKey)
   }
   return clientSingleton
 }
