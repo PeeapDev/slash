@@ -1,11 +1,11 @@
 "use client"
 
-// Data stores with database integration (client-side safe)
-// Database operations should be done through API calls
+// Data stores with IndexedDB write-behind cache
+// Synchronous in-memory cache + async IndexedDB persistence
 
-// Check if we're in browser environment
+import { indexedDBService } from './indexdb-service'
+
 const isClient = typeof window !== 'undefined'
-const isDatabaseEnabled = process.env.NEXT_PUBLIC_DATABASE_ENABLED
 
 export interface HouseholdData {
   id: string
@@ -71,6 +71,7 @@ export interface AuditFlag {
 }
 
 export interface SyncStatus {
+  id?: string
   collectorId: string
   collectorName: string
   lastSync: string
@@ -78,6 +79,14 @@ export interface SyncStatus {
   syncedRecords: number
   status: "synced" | "pending" | "offline"
 }
+
+// ─── Write-behind caches ───
+let _householdCache: HouseholdData[] | null = null
+let _participantCache: ParticipantData[] | null = null
+let _sampleCache: SampleCollectionData[] | null = null
+let _labCache: LabAnalysis[] | null = null
+let _auditFlagCache: AuditFlag[] | null = null
+let _syncStatusCache: SyncStatus[] | null = null
 
 const STORAGE_KEYS = {
   HOUSEHOLD_DATA: "slash_household_data",
@@ -88,140 +97,179 @@ const STORAGE_KEYS = {
   SYNC_STATUS: "slash_sync_status",
 }
 
+type StoreKey = 'household_data' | 'participant_data' | 'sample_collection_data' | 'lab_analysis' | 'audit_flags' | 'sync_status'
+
+function migrateAndGet<T>(cache: T[] | null, localKey: string, idbStore: StoreKey): T[] {
+  if (cache) return cache
+  if (!isClient) return []
+  try {
+    const stored = localStorage.getItem(localKey)
+    if (stored) {
+      const data = JSON.parse(stored) as T[]
+      indexedDBService.setAll(idbStore as any, data).catch(() => {})
+      localStorage.removeItem(localKey)
+      return data
+    }
+  } catch { /* ignore */ }
+  return []
+}
+
+function persistToIDB<T>(store: StoreKey, data: T[]) {
+  indexedDBService.setAll(store as any, data).catch(e => console.warn(`IDB ${store} persist failed:`, e))
+}
+
+// Hydrate from IDB on module load
+if (isClient) {
+  (async () => {
+    try {
+      const [h, p, s, l, a, ss] = await Promise.all([
+        indexedDBService.getAll('household_data'),
+        indexedDBService.getAll('participant_data'),
+        indexedDBService.getAll('sample_collection_data'),
+        indexedDBService.getAll('lab_analysis'),
+        indexedDBService.getAll('audit_flags'),
+        indexedDBService.getAll('sync_status'),
+      ])
+      if (h.length > 0 && !_householdCache) _householdCache = h as HouseholdData[]
+      if (p.length > 0 && !_participantCache) _participantCache = p as ParticipantData[]
+      if (s.length > 0 && !_sampleCache) _sampleCache = s as SampleCollectionData[]
+      if (l.length > 0 && !_labCache) _labCache = l as LabAnalysis[]
+      if (a.length > 0 && !_auditFlagCache) _auditFlagCache = a as AuditFlag[]
+      if (ss.length > 0 && !_syncStatusCache) _syncStatusCache = ss as SyncStatus[]
+    } catch (e) {
+      console.warn('data-store IDB hydration failed:', e)
+    }
+  })()
+}
+
 // Household Data Functions
 export function getHouseholdData(): HouseholdData[] {
-  if (typeof window === "undefined") return []
-  const data = localStorage.getItem(STORAGE_KEYS.HOUSEHOLD_DATA)
-  return data ? JSON.parse(data) : []
+  if (!_householdCache) _householdCache = migrateAndGet<HouseholdData>(_householdCache, STORAGE_KEYS.HOUSEHOLD_DATA, 'household_data')
+  return _householdCache
 }
 
 export function addHouseholdData(data: HouseholdData): void {
-  if (typeof window === "undefined") return
   const existing = getHouseholdData()
   existing.push(data)
-  localStorage.setItem(STORAGE_KEYS.HOUSEHOLD_DATA, JSON.stringify(existing))
+  _householdCache = existing
+  persistToIDB('household_data', existing)
 }
 
 export function updateHouseholdData(id: string, updates: Partial<HouseholdData>): void {
-  if (typeof window === "undefined") return
   const data = getHouseholdData()
   const index = data.findIndex((item) => item.id === id)
   if (index !== -1) {
     data[index] = { ...data[index], ...updates }
-    localStorage.setItem(STORAGE_KEYS.HOUSEHOLD_DATA, JSON.stringify(data))
+    _householdCache = data
+    persistToIDB('household_data', data)
   }
 }
 
 // Participant Data Functions
 export function getParticipantData(): ParticipantData[] {
-  if (typeof window === "undefined") return []
-  const data = localStorage.getItem(STORAGE_KEYS.PARTICIPANT_DATA)
-  return data ? JSON.parse(data) : []
+  if (!_participantCache) _participantCache = migrateAndGet<ParticipantData>(_participantCache, STORAGE_KEYS.PARTICIPANT_DATA, 'participant_data')
+  return _participantCache
 }
 
 export function addParticipantData(data: ParticipantData): void {
-  if (typeof window === "undefined") return
   const existing = getParticipantData()
   existing.push(data)
-  localStorage.setItem(STORAGE_KEYS.PARTICIPANT_DATA, JSON.stringify(existing))
+  _participantCache = existing
+  persistToIDB('participant_data', existing)
 }
 
 export function updateParticipantData(id: string, updates: Partial<ParticipantData>): void {
-  if (typeof window === "undefined") return
   const data = getParticipantData()
   const index = data.findIndex((item) => item.id === id)
   if (index !== -1) {
     data[index] = { ...data[index], ...updates }
-    localStorage.setItem(STORAGE_KEYS.PARTICIPANT_DATA, JSON.stringify(data))
+    _participantCache = data
+    persistToIDB('participant_data', data)
   }
 }
 
 // Sample Collection Data Functions
 export function getSampleCollectionData(): SampleCollectionData[] {
-  if (typeof window === "undefined") return []
-  const data = localStorage.getItem(STORAGE_KEYS.SAMPLE_COLLECTION_DATA)
-  return data ? JSON.parse(data) : []
+  if (!_sampleCache) _sampleCache = migrateAndGet<SampleCollectionData>(_sampleCache, STORAGE_KEYS.SAMPLE_COLLECTION_DATA, 'sample_collection_data')
+  return _sampleCache
 }
 
 export function addSampleCollectionData(data: SampleCollectionData): void {
-  if (typeof window === "undefined") return
   const existing = getSampleCollectionData()
   existing.push(data)
-  localStorage.setItem(STORAGE_KEYS.SAMPLE_COLLECTION_DATA, JSON.stringify(existing))
+  _sampleCache = existing
+  persistToIDB('sample_collection_data', existing)
 }
 
 export function updateSampleCollectionData(id: string, updates: Partial<SampleCollectionData>): void {
-  if (typeof window === "undefined") return
   const data = getSampleCollectionData()
   const index = data.findIndex((item) => item.id === id)
   if (index !== -1) {
     data[index] = { ...data[index], ...updates }
-    localStorage.setItem(STORAGE_KEYS.SAMPLE_COLLECTION_DATA, JSON.stringify(data))
+    _sampleCache = data
+    persistToIDB('sample_collection_data', data)
   }
 }
 
 // Lab Analysis Functions
 export function getLabAnalysis(): LabAnalysis[] {
-  if (typeof window === "undefined") return []
-  const data = localStorage.getItem(STORAGE_KEYS.LAB_ANALYSIS)
-  return data ? JSON.parse(data) : []
+  if (!_labCache) _labCache = migrateAndGet<LabAnalysis>(_labCache, STORAGE_KEYS.LAB_ANALYSIS, 'lab_analysis')
+  return _labCache
 }
 
 export function addLabAnalysis(data: LabAnalysis): void {
-  if (typeof window === "undefined") return
   const existing = getLabAnalysis()
   existing.push(data)
-  localStorage.setItem(STORAGE_KEYS.LAB_ANALYSIS, JSON.stringify(existing))
+  _labCache = existing
+  persistToIDB('lab_analysis', existing)
 }
 
 export function updateLabAnalysis(id: string, updates: Partial<LabAnalysis>): void {
-  if (typeof window === "undefined") return
   const data = getLabAnalysis()
   const index = data.findIndex((item) => item.id === id)
   if (index !== -1) {
     data[index] = { ...data[index], ...updates }
-    localStorage.setItem(STORAGE_KEYS.LAB_ANALYSIS, JSON.stringify(data))
+    _labCache = data
+    persistToIDB('lab_analysis', data)
   }
 }
 
 export function getAuditFlags(): AuditFlag[] {
-  if (typeof window === "undefined") return []
-  const data = localStorage.getItem(STORAGE_KEYS.AUDIT_FLAGS)
-  return data ? JSON.parse(data) : []
+  if (!_auditFlagCache) _auditFlagCache = migrateAndGet<AuditFlag>(_auditFlagCache, STORAGE_KEYS.AUDIT_FLAGS, 'audit_flags')
+  return _auditFlagCache
 }
 
 export function addAuditFlag(flag: AuditFlag): void {
-  if (typeof window === "undefined") return
   const existing = getAuditFlags()
   existing.push(flag)
-  localStorage.setItem(STORAGE_KEYS.AUDIT_FLAGS, JSON.stringify(existing))
+  _auditFlagCache = existing
+  persistToIDB('audit_flags', existing)
 }
 
 export function resolveAuditFlag(flagId: string): void {
-  if (typeof window === "undefined") return
   const flags = getAuditFlags()
   const index = flags.findIndex((f) => f.id === flagId)
   if (index !== -1) {
     flags[index].resolved = true
-    localStorage.setItem(STORAGE_KEYS.AUDIT_FLAGS, JSON.stringify(flags))
+    _auditFlagCache = flags
+    persistToIDB('audit_flags', flags)
   }
 }
 
 // Sync Status Functions
 export function getSyncStatus(): SyncStatus[] {
-  if (typeof window === "undefined") return []
-  const data = localStorage.getItem(STORAGE_KEYS.SYNC_STATUS)
-  return data ? JSON.parse(data) : []
+  if (!_syncStatusCache) _syncStatusCache = migrateAndGet<SyncStatus>(_syncStatusCache, STORAGE_KEYS.SYNC_STATUS, 'sync_status')
+  return _syncStatusCache
 }
 
 export function updateSyncStatus(collectorId: string, status: Partial<SyncStatus>): void {
-  if (typeof window === "undefined") return
   const syncStatuses = getSyncStatus()
   const index = syncStatuses.findIndex((s) => s.collectorId === collectorId)
   if (index !== -1) {
     syncStatuses[index] = { ...syncStatuses[index], ...status }
   } else {
-    syncStatuses.push({ collectorId, ...status } as SyncStatus)
+    syncStatuses.push({ id: collectorId, collectorId, ...status } as SyncStatus)
   }
-  localStorage.setItem(STORAGE_KEYS.SYNC_STATUS, JSON.stringify(syncStatuses))
+  _syncStatusCache = syncStatuses
+  persistToIDB('sync_status', syncStatuses)
 }

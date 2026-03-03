@@ -2,33 +2,49 @@
 
 import { useState, useEffect } from "react"
 import LoginPage from "@/components/login-page"
-import AdminLayout from "@/components/admin-layout"
+import OdkLayout from "@/components/odk-layout"
+import { indexedDBService } from "@/lib/indexdb-service"
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState("dashboard")
 
   useEffect(() => {
-    // Check if user is logged in
-    const storedUser = localStorage.getItem("current_user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-    
-    setIsLoading(false)
+    (async () => {
+      try {
+        const storedUser = await indexedDBService.get<{ id: string; name: string; role: string }>('app_settings', 'current_user')
+        if (storedUser) {
+          setUser(storedUser)
+        }
+      } catch {
+        // Fallback: try localStorage for migration
+        try {
+          const legacy = localStorage.getItem("current_user")
+          if (legacy) {
+            const parsed = JSON.parse(legacy)
+            setUser(parsed)
+            await indexedDBService.set('app_settings', { id: 'current_user', ...parsed })
+            localStorage.removeItem("current_user")
+          }
+        } catch { /* ignore */ }
+      }
+      setIsLoading(false)
+    })()
   }, [])
 
-  const handleLogin = () => {
-    // Create a default user object for the session
-    const userData = { name: "Admin User", role: "superadmin" }
+  const handleLogin = async () => {
+    const userData = { id: 'current_user', name: "Admin User", role: "superadmin" }
     setUser(userData)
-    localStorage.setItem("current_user", JSON.stringify(userData))
+    try {
+      await indexedDBService.set('app_settings', userData)
+    } catch { /* ignore */ }
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setUser(null)
-    localStorage.removeItem("current_user")
+    try {
+      await indexedDBService.delete('app_settings', 'current_user')
+    } catch { /* ignore */ }
   }
 
   if (isLoading) {
@@ -46,20 +62,9 @@ export default function Home() {
     return <LoginPage onLogin={handleLogin} />
   }
 
-  console.log('🚀 Page.tsx: Rendering AdminLayout with props:', {
-    user: user?.name,
-    currentPage,
-    hasOnPageChange: typeof setCurrentPage === 'function'
-  })
-
   return (
     <div className="min-h-screen bg-background">
-      <AdminLayout 
-        user={user}
-        onLogout={handleLogout}
-        currentPage={currentPage}
-        onPageChange={setCurrentPage}
-      />
+      <OdkLayout user={user} onLogout={handleLogout} />
     </div>
   )
 }

@@ -17,42 +17,77 @@ export interface AIAnalysisRequest {
 
 // Main AI analysis function with auto-provider selection
 export const performAIAnalysis = async (request: AIAnalysisRequest): Promise<AIResponse> => {
-  const provider = await getOptimalProvider()
-  
-  if (!provider) {
+  const settings = getAISettings()
+  const activeProviders = getActiveProviders()
+
+  if (activeProviders.length === 0) {
     return {
       success: false,
       error: 'No active AI provider configured. Please set up API credentials in AI Settings.'
     }
   }
 
-  try {
-    switch (provider.id) {
-      case 'openai':
-        return await analyzeWithOpenAI(provider, request)
-      case 'claude':
-        return await analyzeWithClaude(provider, request)
-      case 'deepseek':
-        return await analyzeWithDeepSeek(provider, request)
-      default:
-        return {
-          success: false,
-          error: `Unknown AI provider: ${provider.id}`
+  const preferredProviderId = settings.defaultProvider
+  const preferred = preferredProviderId
+    ? activeProviders.find(p => p.id === preferredProviderId)
+    : null
+
+  const orderedProviders = [
+    ...(preferred ? [preferred] : []),
+    ...activeProviders.filter(p => p.id !== preferred?.id)
+  ]
+
+  let lastError: string | undefined
+
+  for (const provider of orderedProviders) {
+    try {
+      const prompt = buildPrompt(request)
+      const messages = [
+        {
+          role: 'system' as const,
+          content: 'You are a data analyst specializing in health research data validation and analysis. Provide clear, actionable insights.'
+        },
+        {
+          role: 'user' as const,
+          content: prompt
         }
+      ]
+
+      const response = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          providerId: provider.id,
+          apiKey: provider.apiKey,
+          messages,
+          max_tokens: 1000,
+          temperature: 0.1
+        })
+      })
+
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok || !data?.success) {
+        lastError = data?.error || `AI analysis failed (${response.status})`
+        continue
+      }
+
+      return {
+        success: true,
+        data: data?.data ?? 'No response',
+        provider: provider.id
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'AI analysis failed'
     }
-  } catch (error) {
-    // If primary provider fails, try fallback
-    const fallbackProvider = await getOptimalProvider(provider.id)
-    if (fallbackProvider && fallbackProvider.id !== provider.id) {
-      console.log(`Primary provider ${provider.id} failed, trying fallback ${fallbackProvider.id}`)
-      return performAIAnalysis(request) // Recursive call with new optimal provider
-    }
-    
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'AI analysis failed',
-      provider: provider.id
-    }
+  }
+
+  return {
+    success: false,
+    error: lastError || 'AI analysis failed',
+    provider: settings.defaultProvider
   }
 }
 
@@ -124,122 +159,6 @@ export const testAndSelectOptimalProvider = async (): Promise<AIProvider | null>
   }
 
   return null
-}
-
-// OpenAI Analysis
-const analyzeWithOpenAI = async (provider: AIProvider, request: AIAnalysisRequest): Promise<AIResponse> => {
-  const prompt = buildPrompt(request)
-  
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${provider.apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a data analyst specializing in health research data validation and analysis. Provide clear, actionable insights.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.1
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`OpenAI API Error: ${error.error?.message || 'Unknown error'}`)
-  }
-
-  const data = await response.json()
-  return {
-    success: true,
-    data: data.choices[0]?.message?.content || 'No response',
-    provider: 'openai'
-  }
-}
-
-// Claude Analysis
-const analyzeWithClaude = async (provider: AIProvider, request: AIAnalysisRequest): Promise<AIResponse> => {
-  const prompt = buildPrompt(request)
-  
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': provider.apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-sonnet-20240229',
-      max_tokens: 1000,
-      messages: [
-        {
-          role: 'user',
-          content: prompt
-        }
-      ]
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`Claude API Error: ${error.error?.message || 'Unknown error'}`)
-  }
-
-  const data = await response.json()
-  return {
-    success: true,
-    data: data.content[0]?.text || 'No response',
-    provider: 'claude'
-  }
-}
-
-// DeepSeek Analysis
-const analyzeWithDeepSeek = async (provider: AIProvider, request: AIAnalysisRequest): Promise<AIResponse> => {
-  const prompt = buildPrompt(request)
-  
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${provider.apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a data analyst specializing in health research data validation and analysis. Provide clear, actionable insights.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.1
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(`DeepSeek API Error: ${error.error?.message || 'Unknown error'}`)
-  }
-
-  const data = await response.json()
-  return {
-    success: true,
-    data: data.choices[0]?.message?.content || 'No response',
-    provider: 'deepseek'
-  }
 }
 
 // Build analysis prompt based on request type

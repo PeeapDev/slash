@@ -297,6 +297,7 @@ export default function AICredentials() {
               <p><strong>OpenAI:</strong> Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" className="underline">platform.openai.com/api-keys</a></p>
               <p><strong>Claude (Anthropic):</strong> Get your API key from <a href="https://console.anthropic.com/" target="_blank" className="underline">console.anthropic.com</a></p>
               <p><strong>DeepSeek:</strong> Get your API key from <a href="https://platform.deepseek.com/" target="_blank" className="underline">platform.deepseek.com</a></p>
+              <p><strong>Groq:</strong> Get your API key from <a href="https://console.groq.com/keys" target="_blank" className="underline">console.groq.com/keys</a></p>
             </div>
             <p className="text-xs text-blue-700 mt-3">
               <strong>Note:</strong> API keys are stored locally in your browser and are used to communicate with AI services for data analysis and processing.

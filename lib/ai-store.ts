@@ -1,5 +1,7 @@
 "use client"
 
+import { indexedDBService } from './indexdb-service'
+
 export interface AIProvider {
   id: string
   name: string
@@ -12,6 +14,7 @@ export interface AIProvider {
 }
 
 export interface AISettings {
+  id?: string
   providers: AIProvider[]
   defaultProvider?: string
   lastUpdated: string
@@ -42,52 +45,87 @@ const defaultProviders: AIProvider[] = [
     apiKey: '',
     isActive: false,
     testStatus: 'untested'
+  },
+  {
+    id: 'groq',
+    name: 'Groq',
+    description: 'Ultra-fast inference via Groq (OpenAI-compatible API)',
+    apiKey: '',
+    isActive: false,
+    testStatus: 'untested'
   }
 ]
 
 const STORAGE_KEY = 'slash-ai-settings'
 
-// Get AI settings from localStorage
+// ─── Write-behind cache ───
+let _aiSettingsCache: AISettings | null = null
+
+// Hydrate from IDB on module load
+if (typeof window !== 'undefined') {
+  (async () => {
+    try {
+      const stored = await indexedDBService.get<AISettings>('ai_settings', 'main')
+      if (stored && !_aiSettingsCache) {
+        _aiSettingsCache = stored
+      }
+    } catch { /* ignore */ }
+  })()
+}
+
+function persistAISettingsToIDB(settings: AISettings) {
+  indexedDBService.set('ai_settings', { ...settings, id: 'main' }).catch(e =>
+    console.warn('IDB ai_settings persist failed:', e)
+  )
+}
+
+// Get AI settings
 export const getAISettings = (): AISettings => {
   if (typeof window === 'undefined') {
     return { providers: defaultProviders, lastUpdated: new Date().toISOString() }
   }
-  
+
+  if (_aiSettingsCache) {
+    // Merge with defaults to ensure all providers exist
+    const mergedProviders = defaultProviders.map(defaultProvider => {
+      const existingProvider = _aiSettingsCache!.providers?.find((p: AIProvider) => p.id === defaultProvider.id)
+      return existingProvider ? { ...defaultProvider, ...existingProvider } : defaultProvider
+    })
+    return { ..._aiSettingsCache, providers: mergedProviders }
+  }
+
+  // Migration fallback: try localStorage
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       const settings = JSON.parse(stored)
-      // Merge with defaults to ensure all providers exist
       const mergedProviders = defaultProviders.map(defaultProvider => {
         const existingProvider = settings.providers?.find((p: AIProvider) => p.id === defaultProvider.id)
         return existingProvider ? { ...defaultProvider, ...existingProvider } : defaultProvider
       })
-      
-      return {
-        ...settings,
-        providers: mergedProviders
-      }
+      _aiSettingsCache = { ...settings, providers: mergedProviders }
+      persistAISettingsToIDB(_aiSettingsCache!)
+      localStorage.removeItem(STORAGE_KEY)
+      return _aiSettingsCache!
     }
   } catch (error) {
     console.error('Error loading AI settings:', error)
   }
-  
-  return { providers: defaultProviders, lastUpdated: new Date().toISOString() }
+
+  _aiSettingsCache = { providers: defaultProviders, lastUpdated: new Date().toISOString() }
+  return _aiSettingsCache
 }
 
-// Save AI settings to localStorage
+// Save AI settings
 export const saveAISettings = (settings: AISettings): void => {
   if (typeof window === 'undefined') return
-  
-  try {
-    const updatedSettings = {
-      ...settings,
-      lastUpdated: new Date().toISOString()
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedSettings))
-  } catch (error) {
-    console.error('Error saving AI settings:', error)
+
+  const updatedSettings = {
+    ...settings,
+    lastUpdated: new Date().toISOString()
   }
+  _aiSettingsCache = updatedSettings
+  persistAISettingsToIDB(updatedSettings)
 }
 
 // Update a specific provider
@@ -96,7 +134,7 @@ export const updateAIProvider = (providerId: string, updates: Partial<AIProvider
   const updatedProviders = settings.providers.map(provider =>
     provider.id === providerId ? { ...provider, ...updates } : provider
   )
-  
+
   const updatedSettings = { ...settings, providers: updatedProviders }
   saveAISettings(updatedSettings)
   return updatedSettings
@@ -109,15 +147,13 @@ export const testAIProvider = async (provider: AIProvider): Promise<{ success: b
   }
 
   try {
-    // Update provider with testing status
-    updateAIProvider(provider.id, { 
+    updateAIProvider(provider.id, {
       testStatus: 'untested',
       testMessage: 'Testing connection...'
     })
 
     const testResult = await performAITest(provider)
-    
-    // Update provider with test result
+
     updateAIProvider(provider.id, {
       testStatus: testResult.success ? 'success' : 'failed',
       testMessage: testResult.message,
@@ -127,7 +163,7 @@ export const testAIProvider = async (provider: AIProvider): Promise<{ success: b
     return testResult
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-    
+
     updateAIProvider(provider.id, {
       testStatus: 'failed',
       testMessage: errorMessage,
@@ -140,106 +176,36 @@ export const testAIProvider = async (provider: AIProvider): Promise<{ success: b
 
 // Perform actual AI provider test
 const performAITest = async (provider: AIProvider): Promise<{ success: boolean; message: string }> => {
-  const testPrompt = "Hello, this is a test message. Please respond with 'Test successful' if you can read this."
-  
   try {
-    switch (provider.id) {
-      case 'openai':
-        return await testOpenAI(provider.apiKey, testPrompt)
-      case 'claude':
-        return await testClaude(provider.apiKey, testPrompt)
-      case 'deepseek':
-        return await testDeepSeek(provider.apiKey, testPrompt)
-      default:
-        return { success: false, message: 'Unknown provider' }
+    const response = await fetch('/api/ai/test', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        providerId: provider.id,
+        apiKey: provider.apiKey
+      })
+    })
+
+    const data = await response.json().catch(() => null)
+
+    if (!response.ok || !data?.success) {
+      return {
+        success: false,
+        message: data?.error || 'Connection test failed'
+      }
+    }
+
+    return {
+      success: true,
+      message: `Connection successful! Provider: ${provider.name}`
     }
   } catch (error) {
-    return { 
-      success: false, 
-      message: error instanceof Error ? error.message : 'Connection test failed' 
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Connection test failed'
     }
-  }
-}
-
-// Test OpenAI connection
-const testOpenAI = async (apiKey: string, prompt: string): Promise<{ success: boolean; message: string }> => {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 50
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    return { success: false, message: `OpenAI API Error: ${error.error?.message || 'Unknown error'}` }
-  }
-
-  const data = await response.json()
-  return { 
-    success: true, 
-    message: `Connection successful! Model: ${data.model || 'gpt-3.5-turbo'}` 
-  }
-}
-
-// Test Claude connection
-const testClaude = async (apiKey: string, prompt: string): Promise<{ success: boolean; message: string }> => {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01'
-    },
-    body: JSON.stringify({
-      model: 'claude-3-sonnet-20240229',
-      max_tokens: 50,
-      messages: [{ role: 'user', content: prompt }]
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    return { success: false, message: `Claude API Error: ${error.error?.message || 'Unknown error'}` }
-  }
-
-  const data = await response.json()
-  return { 
-    success: true, 
-    message: `Connection successful! Model: ${data.model || 'claude-3-sonnet'}` 
-  }
-}
-
-// Test DeepSeek connection
-const testDeepSeek = async (apiKey: string, prompt: string): Promise<{ success: boolean; message: string }> => {
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify({
-      model: 'deepseek-chat',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 50
-    })
-  })
-
-  if (!response.ok) {
-    const error = await response.json()
-    return { success: false, message: `DeepSeek API Error: ${error.error?.message || 'Unknown error'}` }
-  }
-
-  const data = await response.json()
-  return { 
-    success: true, 
-    message: `Connection successful! Model: ${data.model || 'deepseek-chat'}` 
   }
 }
 
@@ -253,15 +219,14 @@ export const getActiveProviders = (): AIProvider[] => {
 export const getDefaultProvider = (): AIProvider | null => {
   const settings = getAISettings()
   const defaultId = settings.defaultProvider
-  
+
   if (defaultId) {
     const provider = settings.providers.find(p => p.id === defaultId)
     if (provider && provider.isActive && provider.apiKey) {
       return provider
     }
   }
-  
-  // Return first active provider if no default set
+
   const activeProviders = getActiveProviders()
   return activeProviders.length > 0 ? activeProviders[0] : null
 }
