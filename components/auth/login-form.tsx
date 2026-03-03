@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,10 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Activity, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
+import OdkLayout from "@/components/odk-layout"
 
 export default function LoginForm() {
-  const { login, isAuthenticated, supabaseConfigured } = useAuth()
-  const router = useRouter()
+  const { login, logout, user, isAuthenticated, isLoading, supabaseConfigured } = useAuth()
   const searchParams = useSearchParams()
   const redirect = searchParams.get("redirect") || "/"
 
@@ -23,16 +23,38 @@ export default function LoginForm() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
-  // If Supabase not configured, redirect to home (offline mode handles auth there)
+  // If Supabase not configured, show offline message
   if (!supabaseConfigured) {
-    if (typeof window !== "undefined") window.location.href = "/"
-    return null
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">Running in offline mode. <Link href="/" className="text-primary underline">Go to app</Link></p>
+      </div>
+    )
   }
 
-  // Already authenticated → go to dashboard
-  if (isAuthenticated) {
-    if (typeof window !== "undefined") window.location.href = redirect
-    return null
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto" />
+      </div>
+    )
+  }
+
+  // Already authenticated → show dashboard (or redirect)
+  if (isAuthenticated && user) {
+    if (redirect !== "/" && redirect !== "/login") {
+      window.location.href = redirect
+      return null
+    }
+    // Show the dashboard directly
+    return (
+      <div className="min-h-screen bg-background">
+        <OdkLayout
+          user={{ id: user.id, name: user.full_name, role: user.role }}
+          onLogout={async () => { await logout() }}
+        />
+      </div>
+    )
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,12 +64,10 @@ export default function LoginForm() {
 
     try {
       const result = await login(email, password)
-      if (result.success) {
-        // Full page reload so middleware picks up the new auth cookies
-        window.location.href = redirect
-      } else {
+      if (!result.success) {
         setError(result.error || "Login failed")
       }
+      // On success, auth context updates → this component re-renders → shows dashboard
     } catch {
       setError("An unexpected error occurred")
     } finally {
