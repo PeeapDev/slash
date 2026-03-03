@@ -56,7 +56,7 @@ const defaultProviders: AIProvider[] = [
   }
 ]
 
-const STORAGE_KEY = 'slash-ai-settings'
+// IDB store key for AI settings
 
 // ─── Write-behind cache ───
 let _aiSettingsCache: AISettings | null = null
@@ -94,23 +94,7 @@ export const getAISettings = (): AISettings => {
     return { ..._aiSettingsCache, providers: mergedProviders }
   }
 
-  // Migration fallback: try localStorage
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      const settings = JSON.parse(stored)
-      const mergedProviders = defaultProviders.map(defaultProvider => {
-        const existingProvider = settings.providers?.find((p: AIProvider) => p.id === defaultProvider.id)
-        return existingProvider ? { ...defaultProvider, ...existingProvider } : defaultProvider
-      })
-      _aiSettingsCache = { ...settings, providers: mergedProviders }
-      persistAISettingsToIDB(_aiSettingsCache!)
-      localStorage.removeItem(STORAGE_KEY)
-      return _aiSettingsCache!
-    }
-  } catch (error) {
-    console.error('Error loading AI settings:', error)
-  }
+  // No fallback — IDB is the only source of truth
 
   _aiSettingsCache = { providers: defaultProviders, lastUpdated: new Date().toISOString() }
   return _aiSettingsCache

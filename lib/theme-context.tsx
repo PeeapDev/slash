@@ -2,6 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
+import { indexedDBService } from "@/lib/indexdb-service"
 
 type Theme = "light" | "dark"
 
@@ -17,24 +18,35 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Get saved theme from localStorage or system preference
-    const savedTheme = localStorage.getItem("theme") as Theme | null
-    const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-    const initialTheme = savedTheme || systemTheme
-
-    setTheme(initialTheme)
-    applyTheme(initialTheme)
-    setMounted(true)
+    const loadTheme = async () => {
+      try {
+        const stored = await indexedDBService.get<{ id: string; value: Theme }>('app_settings', 'theme')
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        const initialTheme = stored?.value || systemTheme
+        setTheme(initialTheme)
+        applyThemeToDOM(initialTheme)
+      } catch {
+        const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        setTheme(systemTheme)
+        applyThemeToDOM(systemTheme)
+      }
+      setMounted(true)
+    }
+    loadTheme()
   }, [])
 
-  const applyTheme = (newTheme: Theme) => {
+  const applyThemeToDOM = (newTheme: Theme) => {
     const htmlElement = document.documentElement
     if (newTheme === "dark") {
       htmlElement.classList.add("dark")
     } else {
       htmlElement.classList.remove("dark")
     }
-    localStorage.setItem("theme", newTheme)
+  }
+
+  const applyTheme = (newTheme: Theme) => {
+    applyThemeToDOM(newTheme)
+    indexedDBService.set('app_settings', { id: 'theme', value: newTheme }).catch(() => {})
   }
 
   const toggleTheme = () => {

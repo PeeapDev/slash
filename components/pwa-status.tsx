@@ -20,7 +20,6 @@ import {
 } from "lucide-react"
 import { usePWA } from "@/lib/pwa-utils"
 import { indexedDBService } from "@/lib/indexdb-service"
-import { migrationService } from "@/lib/migration-service"
 import { getDataSummary } from "@/lib/offline-data-store"
 import IndexedDBDebug from "./indexdb-debug"
 import QuickProjectTest from "./quick-project-test"
@@ -44,13 +43,12 @@ export default function PWAStatus() {
   const pwa = usePWA()
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null)
   const [dataSummary, setDataSummary] = useState<DataSummary | null>(null)
-  const [isMigrated, setIsMigrated] = useState(false)
+  const [isMigrated] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   useEffect(() => {
     loadStorageInfo()
     loadDataSummary()
-    checkMigrationStatus()
   }, [])
 
   const loadStorageInfo = async () => {
@@ -77,17 +75,12 @@ export default function PWAStatus() {
     }
   }
 
-  const checkMigrationStatus = () => {
-    setIsMigrated(migrationService.isMigrated())
-  }
-
   const handleRefresh = async () => {
     setIsRefreshing(true)
     try {
       await Promise.all([
         loadStorageInfo(),
         loadDataSummary(),
-        checkMigrationStatus()
       ])
     } finally {
       setIsRefreshing(false)

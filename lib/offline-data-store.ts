@@ -3,7 +3,7 @@
 import { indexedDBService } from './indexdb-service'
 
 // Offline-first data store using IndexedDB
-// Replaces localStorage-based data-store.ts
+// IndexedDB-backed data store
 
 export interface HouseholdData {
   id: string

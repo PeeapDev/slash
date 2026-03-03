@@ -16,18 +16,7 @@ export default function Home() {
         if (storedUser) {
           setUser(storedUser)
         }
-      } catch {
-        // Fallback: try localStorage for migration
-        try {
-          const legacy = localStorage.getItem("current_user")
-          if (legacy) {
-            const parsed = JSON.parse(legacy)
-            setUser(parsed)
-            await indexedDBService.set('app_settings', { id: 'current_user', ...parsed })
-            localStorage.removeItem("current_user")
-          }
-        } catch { /* ignore */ }
-      }
+      } catch { /* ignore */ }
       setIsLoading(false)
     })()
   }, [])

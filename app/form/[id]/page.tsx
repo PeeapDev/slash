@@ -147,6 +147,23 @@ export default function PublicFormPage() {
   // Invisible time tracking
   const startedAtRef = useRef(new Date().toISOString())
 
+  // Device ID from IndexedDB
+  const deviceIdRef = useRef('unknown')
+  useEffect(() => {
+    (async () => {
+      try {
+        const { indexedDBService } = await import('@/lib/indexdb-service')
+        const stored = await indexedDBService.get<{ id: string; value: string }>('app_settings', 'slash_device_id')
+        if (stored?.value) deviceIdRef.current = stored.value
+        else {
+          const newId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+          deviceIdRef.current = newId
+          await indexedDBService.set('app_settings', { id: 'slash_device_id', value: newId })
+        }
+      } catch { /* ignore */ }
+    })()
+  }, [])
+
   // Signature canvas refs
   const signatureCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({})
   const signatureDrawingRef = useRef<Record<string, boolean>>({})
@@ -329,7 +346,7 @@ export default function PublicFormPage() {
 
   // ─── Metadata ───
   const buildMetadata = () => ({
-    deviceId: typeof window !== 'undefined' ? localStorage.getItem('slash_device_id') || 'unknown' : 'unknown',
+    deviceId: deviceIdRef.current,
     startedAt: startedAtRef.current,
     completedAt: new Date().toISOString(),
     today: new Date().toISOString().split('T')[0],

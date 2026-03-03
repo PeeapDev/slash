@@ -458,20 +458,6 @@ const sampleResponses: FormResponse[] = [
 export function getForms(): Form[] {
   if (_formsCache) return _formsCache
 
-  // Migration fallback: read from localStorage if IDB hasn't hydrated yet
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('slash_forms')
-      if (stored) {
-        _formsCache = JSON.parse(stored)
-        // Migrate to IndexedDB and clean up localStorage
-        persistFormsToIDB(_formsCache!)
-        localStorage.removeItem('slash_forms')
-        return _formsCache!
-      }
-    } catch { /* ignore */ }
-  }
-
   _formsCache = [...sampleForms]
   persistFormsToIDB(_formsCache)
   return _formsCache
@@ -484,18 +470,6 @@ export function saveForms(forms: Form[]): void {
 
 export function getFormResponses(): FormResponse[] {
   if (_responsesCache) return _responsesCache
-
-  if (typeof window !== 'undefined') {
-    try {
-      const stored = localStorage.getItem('slash_form_responses')
-      if (stored) {
-        _responsesCache = JSON.parse(stored)
-        persistResponsesToIDB(_responsesCache!)
-        localStorage.removeItem('slash_form_responses')
-        return _responsesCache!
-      }
-    } catch { /* ignore */ }
-  }
 
   _responsesCache = [...sampleResponses]
   persistResponsesToIDB(_responsesCache)

@@ -653,15 +653,32 @@ class OfflineFirstDB {
   }
 
   // Utility Methods
+  private _deviceId: string | null = null
+
   private getOrCreateDeviceId(): string {
     if (typeof window === 'undefined') return 'server'
-    
-    let deviceId = localStorage.getItem('slash_device_id')
-    if (!deviceId) {
-      deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      localStorage.setItem('slash_device_id', deviceId)
-    }
-    return deviceId
+
+    if (this._deviceId) return this._deviceId
+
+    // Generate a new device ID (will be persisted to IDB asynchronously)
+    this._deviceId = `device_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+    // Try to load from IDB, or persist the new one
+    this.loadOrPersistDeviceId()
+
+    return this._deviceId
+  }
+
+  private async loadOrPersistDeviceId(): Promise<void> {
+    try {
+      const { indexedDBService } = await import('./indexdb-service')
+      const stored = await indexedDBService.get<{ id: string; value: string }>('app_settings', 'slash_device_id')
+      if (stored?.value) {
+        this._deviceId = stored.value
+      } else {
+        await indexedDBService.set('app_settings', { id: 'slash_device_id', value: this._deviceId })
+      }
+    } catch { /* ignore */ }
   }
 
   private getOrCreateCollectorSession(): string {

@@ -1,7 +1,7 @@
 "use client"
 
 // IndexedDB Service for Offline-First PWA
-// Replaces localStorage with IndexedDB for better performance and storage
+// Primary data storage for the platform
 
 interface DBSchema {
   // Forms and Responses

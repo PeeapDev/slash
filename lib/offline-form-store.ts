@@ -3,7 +3,7 @@
 import { indexedDBService } from './indexdb-service'
 
 // Offline-first form store using IndexedDB
-// Replaces localStorage-based form-store.ts
+// IndexedDB-backed form store
 
 export interface Form {
   id: string

@@ -88,29 +88,10 @@ let _labCache: LabAnalysis[] | null = null
 let _auditFlagCache: AuditFlag[] | null = null
 let _syncStatusCache: SyncStatus[] | null = null
 
-const STORAGE_KEYS = {
-  HOUSEHOLD_DATA: "slash_household_data",
-  PARTICIPANT_DATA: "slash_participant_data",
-  SAMPLE_COLLECTION_DATA: "slash_sample_collection_data",
-  LAB_ANALYSIS: "slash_lab_analysis",
-  AUDIT_FLAGS: "slash_audit_flags",
-  SYNC_STATUS: "slash_sync_status",
-}
-
 type StoreKey = 'household_data' | 'participant_data' | 'sample_collection_data' | 'lab_analysis' | 'audit_flags' | 'sync_status'
 
-function migrateAndGet<T>(cache: T[] | null, localKey: string, idbStore: StoreKey): T[] {
+function getOrDefault<T>(cache: T[] | null): T[] {
   if (cache) return cache
-  if (!isClient) return []
-  try {
-    const stored = localStorage.getItem(localKey)
-    if (stored) {
-      const data = JSON.parse(stored) as T[]
-      indexedDBService.setAll(idbStore as any, data).catch(() => {})
-      localStorage.removeItem(localKey)
-      return data
-    }
-  } catch { /* ignore */ }
   return []
 }
 
@@ -144,7 +125,7 @@ if (isClient) {
 
 // Household Data Functions
 export function getHouseholdData(): HouseholdData[] {
-  if (!_householdCache) _householdCache = migrateAndGet<HouseholdData>(_householdCache, STORAGE_KEYS.HOUSEHOLD_DATA, 'household_data')
+  if (!_householdCache) _householdCache = getOrDefault<HouseholdData>(_householdCache)
   return _householdCache
 }
 
@@ -167,7 +148,7 @@ export function updateHouseholdData(id: string, updates: Partial<HouseholdData>)
 
 // Participant Data Functions
 export function getParticipantData(): ParticipantData[] {
-  if (!_participantCache) _participantCache = migrateAndGet<ParticipantData>(_participantCache, STORAGE_KEYS.PARTICIPANT_DATA, 'participant_data')
+  if (!_participantCache) _participantCache = getOrDefault<ParticipantData>(_participantCache)
   return _participantCache
 }
 
@@ -190,7 +171,7 @@ export function updateParticipantData(id: string, updates: Partial<ParticipantDa
 
 // Sample Collection Data Functions
 export function getSampleCollectionData(): SampleCollectionData[] {
-  if (!_sampleCache) _sampleCache = migrateAndGet<SampleCollectionData>(_sampleCache, STORAGE_KEYS.SAMPLE_COLLECTION_DATA, 'sample_collection_data')
+  if (!_sampleCache) _sampleCache = getOrDefault<SampleCollectionData>(_sampleCache)
   return _sampleCache
 }
 
@@ -213,7 +194,7 @@ export function updateSampleCollectionData(id: string, updates: Partial<SampleCo
 
 // Lab Analysis Functions
 export function getLabAnalysis(): LabAnalysis[] {
-  if (!_labCache) _labCache = migrateAndGet<LabAnalysis>(_labCache, STORAGE_KEYS.LAB_ANALYSIS, 'lab_analysis')
+  if (!_labCache) _labCache = getOrDefault<LabAnalysis>(_labCache)
   return _labCache
 }
 
@@ -235,7 +216,7 @@ export function updateLabAnalysis(id: string, updates: Partial<LabAnalysis>): vo
 }
 
 export function getAuditFlags(): AuditFlag[] {
-  if (!_auditFlagCache) _auditFlagCache = migrateAndGet<AuditFlag>(_auditFlagCache, STORAGE_KEYS.AUDIT_FLAGS, 'audit_flags')
+  if (!_auditFlagCache) _auditFlagCache = getOrDefault<AuditFlag>(_auditFlagCache)
   return _auditFlagCache
 }
 
@@ -258,7 +239,7 @@ export function resolveAuditFlag(flagId: string): void {
 
 // Sync Status Functions
 export function getSyncStatus(): SyncStatus[] {
-  if (!_syncStatusCache) _syncStatusCache = migrateAndGet<SyncStatus>(_syncStatusCache, STORAGE_KEYS.SYNC_STATUS, 'sync_status')
+  if (!_syncStatusCache) _syncStatusCache = getOrDefault<SyncStatus>(_syncStatusCache)
   return _syncStatusCache
 }
 

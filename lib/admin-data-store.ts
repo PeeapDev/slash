@@ -177,18 +177,8 @@ let _samplesCache: Sample[] | null = null
 
 const isClient = typeof window !== 'undefined'
 
-// Generic migration: read from localStorage → persist to IDB → remove from localStorage
-function migrateAndGet<T>(localKey: string, idbStore: string): T[] {
-  if (!isClient) return []
-  try {
-    const stored = localStorage.getItem(localKey)
-    if (stored) {
-      const data = JSON.parse(stored) as T[]
-      indexedDBService.setAll(idbStore as any, data).catch(() => {})
-      localStorage.removeItem(localKey)
-      return data
-    }
-  } catch { /* ignore */ }
+// Return empty array (IDB is hydrated on module load, cache is source of truth)
+function getOrDefault<T>(): T[] {
   return []
 }
 
@@ -228,7 +218,7 @@ export function addAdminUser(user: AdminUser) {
 
 export function getAdminUsers() {
   if (_adminUsersCache) return _adminUsersCache
-  _adminUsersCache = migrateAndGet<AdminUser>('admin_users', 'admin_users')
+  _adminUsersCache = getOrDefault<AdminUser>()
   return _adminUsersCache
 }
 
@@ -274,24 +264,13 @@ export function addAuditLog(log: AuditLog) {
 
 export function getAuditLogs() {
   if (_auditLogsCache) return _auditLogsCache
-  _auditLogsCache = migrateAndGet<AuditLog>('audit_logs', 'audit_logs')
+  _auditLogsCache = getOrDefault<AuditLog>()
   return _auditLogsCache
 }
 
 // Role Permissions
 export function getRolePermissions(role: string) {
   if (_rolePermissionsCache) return _rolePermissionsCache[role] || {}
-  if (!isClient) return {}
-  try {
-    const stored = localStorage.getItem("role_permissions")
-    if (stored) {
-      _rolePermissionsCache = JSON.parse(stored)
-      // Migrate to IDB
-      indexedDBService.set('app_settings', { id: 'role_permissions', data: _rolePermissionsCache }).catch(() => {})
-      localStorage.removeItem("role_permissions")
-      return _rolePermissionsCache![role] || {}
-    }
-  } catch { /* ignore */ }
   _rolePermissionsCache = {}
   return {}
 }
@@ -387,22 +366,6 @@ export function addRole(role: Role) {
 
 export function getRoles() {
   if (_rolesCache) return _rolesCache
-
-  if (isClient) {
-    try {
-      const stored = localStorage.getItem("roles")
-      if (stored) {
-        const parsed = JSON.parse(stored) as Role[]
-        if (parsed.length > 0) {
-          _rolesCache = parsed
-          persistToIDB('app_settings', [{ id: 'roles', data: parsed }] as any)
-          localStorage.removeItem("roles")
-          return _rolesCache
-        }
-      }
-    } catch { /* ignore */ }
-  }
-
   _rolesCache = [...defaultRoles]
   return _rolesCache
 }
@@ -433,19 +396,6 @@ export function addStaff(staff: Staff) {
 
 export function getStaff() {
   if (_staffCache) return _staffCache
-
-  if (isClient) {
-    try {
-      const stored = localStorage.getItem("staff")
-      if (stored) {
-        _staffCache = JSON.parse(stored)
-        persistToIDB('app_settings', [{ id: 'staff', data: _staffCache }] as any)
-        localStorage.removeItem("staff")
-        return _staffCache!
-      }
-    } catch { /* ignore */ }
-  }
-
   _staffCache = []
   return _staffCache
 }
@@ -476,7 +426,7 @@ export function addProject(project: Project) {
 
 export function getProjects() {
   if (_projectsCache) return _projectsCache
-  _projectsCache = migrateAndGet<Project>('projects', 'projects')
+  _projectsCache = getOrDefault<Project>()
   return _projectsCache
 }
 
@@ -511,19 +461,6 @@ export function addHousehold(household: Household) {
 
 export function getHouseholds() {
   if (_householdsCache) return _householdsCache
-
-  if (isClient) {
-    try {
-      const stored = localStorage.getItem("households")
-      if (stored) {
-        _householdsCache = JSON.parse(stored)
-        persistToIDB('app_settings', [{ id: 'households', data: _householdsCache }] as any)
-        localStorage.removeItem("households")
-        return _householdsCache!
-      }
-    } catch { /* ignore */ }
-  }
-
   _householdsCache = []
   return _householdsCache
 }
@@ -559,19 +496,6 @@ export function addParticipant(participant: Participant) {
 
 export function getParticipants() {
   if (_participantsCache) return _participantsCache
-
-  if (isClient) {
-    try {
-      const stored = localStorage.getItem("participants")
-      if (stored) {
-        _participantsCache = JSON.parse(stored)
-        persistToIDB('app_settings', [{ id: 'participants', data: _participantsCache }] as any)
-        localStorage.removeItem("participants")
-        return _participantsCache!
-      }
-    } catch { /* ignore */ }
-  }
-
   _participantsCache = []
   return _participantsCache
 }
@@ -607,19 +531,6 @@ export function addSurvey(survey: Survey) {
 
 export function getSurveys() {
   if (_surveysCache) return _surveysCache
-
-  if (isClient) {
-    try {
-      const stored = localStorage.getItem("surveys")
-      if (stored) {
-        _surveysCache = JSON.parse(stored)
-        persistToIDB('app_settings', [{ id: 'surveys', data: _surveysCache }] as any)
-        localStorage.removeItem("surveys")
-        return _surveysCache!
-      }
-    } catch { /* ignore */ }
-  }
-
   _surveysCache = []
   return _surveysCache
 }
@@ -655,19 +566,6 @@ export function addSample(sample: Sample) {
 
 export function getSamples() {
   if (_samplesCache) return _samplesCache
-
-  if (isClient) {
-    try {
-      const stored = localStorage.getItem("samples")
-      if (stored) {
-        _samplesCache = JSON.parse(stored)
-        persistToIDB('app_settings', [{ id: 'samples', data: _samplesCache }] as any)
-        localStorage.removeItem("samples")
-        return _samplesCache!
-      }
-    } catch { /* ignore */ }
-  }
-
   _samplesCache = []
   return _samplesCache
 }
