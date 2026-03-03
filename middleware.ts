@@ -3,6 +3,7 @@ import { createServerClient } from '@supabase/ssr'
 
 // Public routes that don't require authentication
 const PUBLIC_ROUTES = [
+  '/',
   '/login',
   '/register',
   '/api/auth/login',
@@ -17,6 +18,7 @@ const PUBLIC_PREFIXES = [
   '/sw.js',
   '/manifest.json',
   '/apple-icon',
+  '/form/',
 ]
 
 function isPublicRoute(pathname: string): boolean {
