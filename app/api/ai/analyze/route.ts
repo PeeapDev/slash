@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     const max_tokens = typeof body.max_tokens === "number" ? body.max_tokens : 1000
 
     if (body.providerId === "claude") {
-      const model = body.model || "claude-3-sonnet-20240229"
+      const model = body.model || "claude-haiku-4-5-20251001"
       const userMessages = body.messages
         .filter((m) => m.role !== "system")
         .map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.content }))
