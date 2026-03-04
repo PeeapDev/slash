@@ -13,17 +13,22 @@ export async function POST(request: NextRequest) {
 
     if (!providerId) return jsonError(400, "Missing providerId")
 
-    // Prefer user-provided key, fallback to env var
-    const envKeys: Record<ProviderId, string | undefined> = {
-      openai: process.env.OPENAI_API_KEY,
-      claude: process.env.ANTHROPIC_API_KEY,
-      deepseek: process.env.DEEPSEEK_API_KEY,
-      groq: process.env.GROQ_API_KEY,
-    }
-    const apiKey = bodyKey || envKeys[providerId]
-    if (!apiKey) return jsonError(400, "Missing API key for provider")
+    // ONLY use the key provided in the request body
+    // Env vars are NOT used for test — this ensures the user's entered key is tested
+    const apiKey = bodyKey
+    if (!apiKey) return jsonError(400, "No API key provided. Please enter and save your key first.")
 
-    // Test directly — don't route through /api/ai/analyze
+    // Validate key format
+    if (providerId === "claude" && !apiKey.startsWith("sk-ant-")) {
+      return jsonError(400, "Invalid Claude key format. Anthropic keys start with 'sk-ant-'. Check that you entered the correct key for Claude.")
+    }
+    if (providerId === "groq" && !apiKey.startsWith("gsk_")) {
+      return jsonError(400, "Invalid Groq key format. Groq keys start with 'gsk_'. Check that you entered the correct key.")
+    }
+    if (providerId === "openai" && !apiKey.startsWith("sk-")) {
+      return jsonError(400, "Invalid OpenAI key format. OpenAI keys start with 'sk-'. Check that you entered the correct key.")
+    }
+
     if (providerId === "claude") {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -41,7 +46,7 @@ export async function POST(request: NextRequest) {
       })
       if (!res.ok) {
         const text = await res.text()
-        return jsonError(res.status, `Claude API: ${text}`)
+        return jsonError(res.status, `Claude API error: ${text}`)
       }
       return NextResponse.json({ success: true, message: "Connection successful", provider: "claude" })
     }
@@ -53,9 +58,9 @@ export async function POST(request: NextRequest) {
       groq: "https://api.groq.com/openai/v1/chat/completions",
     }
     const models: Record<string, string> = {
-      openai: "gpt-3.5-turbo",
+      openai: "gpt-4o-mini",
       deepseek: "deepseek-chat",
-      groq: "llama3-70b-8192",
+      groq: "llama-3.1-8b-instant",
     }
 
     const res = await fetch(urls[providerId], {
@@ -74,7 +79,7 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       const text = await res.text()
-      return jsonError(res.status, `${providerId} API: ${text}`)
+      return jsonError(res.status, `${providerId} API error: ${text}`)
     }
 
     return NextResponse.json({ success: true, message: "Connection successful", provider: providerId })

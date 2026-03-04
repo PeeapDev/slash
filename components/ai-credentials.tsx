@@ -73,15 +73,33 @@ export default function AICredentials() {
   }
 
   const handleTest = async (provider: AIProvider) => {
+    // Always use the current input value (tempKeys), not stored value
+    const currentKey = (tempKeys[provider.id] || '').trim()
+    if (!currentKey) {
+      alert('Please enter an API key first')
+      return
+    }
+
+    // Auto-save the key before testing
+    if (currentKey !== provider.apiKey) {
+      const updated = updateAIProvider(provider.id, {
+        apiKey: currentKey,
+        testStatus: 'untested',
+        testMessage: undefined,
+        lastTested: undefined,
+      })
+      setProviders(updated.providers)
+    }
+
     setTesting(prev => ({ ...prev, [provider.id]: true }))
-    
+
     try {
-      const result = await testAIProvider(provider)
-      
-      // Refresh providers to get updated test status
+      // Use the current key directly
+      const providerWithKey = { ...provider, apiKey: currentKey }
+      const result = await testAIProvider(providerWithKey)
+
       const settings = getAISettings()
       setProviders(settings.providers)
-      
     } catch (error) {
       console.error('Test failed:', error)
     } finally {

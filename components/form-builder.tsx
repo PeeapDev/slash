@@ -60,6 +60,10 @@ import {
   Activity,
   Baby,
   Loader2,
+  LayoutGrid,
+  List,
+  FolderOpen,
+  Folder,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { Form, getForms, deleteForm, cloneForm, getFormResponses, createForm } from "@/lib/form-store"
@@ -203,6 +207,7 @@ export default function FormBuilder() {
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'table' | 'folder'>('folder')
   const [aiPrompt, setAiPrompt] = useState("")
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState("")
@@ -610,6 +615,156 @@ export default function FormBuilder() {
     </TableRow>
   )
 
+  // Group forms by type for folder view
+  const renderFolderView = (formsToRender: Form[]) => {
+    const grouped: Record<string, Form[]> = {}
+    formsToRender.forEach(f => {
+      const key = f.type === 'sample' ? 'Sample Collection' : 'Surveys'
+      if (!grouped[key]) grouped[key] = []
+      grouped[key].push(f)
+    })
+
+    const groupOrder = ['Surveys', 'Sample Collection']
+    const sortedGroups = groupOrder.filter(g => grouped[g]?.length)
+
+    // If only one group, skip the folder headers
+    if (sortedGroups.length <= 1) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {formsToRender.map(renderFormCard)}
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        {sortedGroups.map(group => (
+          <div key={group}>
+            <div className="flex items-center gap-2 mb-3">
+              <FolderOpen className="w-4 h-4 text-muted-foreground" />
+              <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">{group}</h3>
+              <Badge variant="outline" className="text-[10px]">{grouped[group].length}</Badge>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+              {grouped[group].map(renderFormCard)}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const renderFormCard = (form: Form) => (
+    <Card
+      key={form.id}
+      className="group cursor-pointer hover:shadow-md hover:border-primary/30 transition-all"
+      onDoubleClick={() => handleEdit(form)}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            {form.type === 'survey'
+              ? <FileText className="w-5 h-5 text-blue-500 shrink-0" />
+              : <Beaker className="w-5 h-5 text-purple-500 shrink-0" />
+            }
+            <h4 className="font-medium text-sm truncate">{form.name}</h4>
+          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleEdit(form)}>
+                <Edit3 className="w-4 h-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handlePreview(form)}>
+                <Eye className="w-4 h-4 mr-2" />
+                Preview
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleClone(form)}>
+                <Copy className="w-4 h-4 mr-2" />
+                Clone
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleCopyLink(form)}>
+                {copiedFormId === form.id
+                  ? <><Check className="w-4 h-4 mr-2" /> Copied!</>
+                  : <><Link2 className="w-4 h-4 mr-2" /> Copy Link</>
+                }
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleShare(form)}>
+                <Share2 className="w-4 h-4 mr-2" />
+                Share
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDelete(form.id)}
+                className="text-red-600 focus:text-red-600"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+        <div className="mt-3 flex items-center gap-2 flex-wrap">
+          <Badge
+            variant="outline"
+            className={
+              form.publishStatus === 'published'
+                ? 'bg-green-50 text-green-700 border-green-200 text-[10px]'
+                : 'bg-amber-50 text-amber-700 border-amber-200 text-[10px]'
+            }
+          >
+            {form.publishStatus === 'published' ? 'Published' : 'Draft'}
+          </Badge>
+          <span className="text-xs text-muted-foreground">{form.fields.length} questions</span>
+          <span className="text-xs text-muted-foreground">{responseCounts[form.id] || 0} submissions</span>
+        </div>
+        <div className="mt-2 text-xs text-muted-foreground">
+          {formatDistanceToNow(new Date(form.updatedAt), { addSuffix: true })}
+        </div>
+        <div className="mt-3 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs gap-1"
+            onClick={(e) => { e.stopPropagation(); handleEdit(form) }}
+          >
+            <Edit3 className="w-3 h-3" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs gap-1"
+            onClick={(e) => { e.stopPropagation(); handlePreview(form) }}
+          >
+            <Eye className="w-3 h-3" />
+            Preview
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 text-xs gap-1"
+            onClick={(e) => { e.stopPropagation(); handleCopyLink(form) }}
+          >
+            {copiedFormId === form.id ? <Check className="w-3 h-3" /> : <Link2 className="w-3 h-3" />}
+            {copiedFormId === form.id ? 'Copied' : 'Link'}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
   const renderTableHeader = () => (
     <TableHeader>
       <TableRow>
@@ -768,19 +923,44 @@ export default function FormBuilder() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          {/* View toggle */}
+          <div className="flex items-center border rounded-md h-8">
+            <Button
+              variant={viewMode === 'folder' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 w-8 p-0 rounded-r-none"
+              onClick={() => setViewMode('folder')}
+              title="Folder view"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+            </Button>
+            <Button
+              variant={viewMode === 'table' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-8 w-8 p-0 rounded-l-none"
+              onClick={() => setViewMode('table')}
+              title="Table view"
+            >
+              <List className="w-3.5 h-3.5" />
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Active forms table */}
+      {/* Forms display */}
       {activeForms.length > 0 ? (
-        <Card>
-          <Table>
-            {renderTableHeader()}
-            <TableBody>
-              {activeForms.map(renderFormRow)}
-            </TableBody>
-          </Table>
-        </Card>
+        viewMode === 'table' ? (
+          <Card>
+            <Table>
+              {renderTableHeader()}
+              <TableBody>
+                {activeForms.map(renderFormRow)}
+              </TableBody>
+            </Table>
+          </Card>
+        ) : (
+          renderFolderView(activeForms)
+        )
       ) : filteredForms.length === 0 ? (
         <Card className="p-12 text-center">
           <div className="space-y-4">
@@ -815,12 +995,18 @@ export default function FormBuilder() {
               Archived ({archivedForms.length})
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <Table>
-                {renderTableHeader()}
-                <TableBody>
-                  {archivedForms.map(renderFormRow)}
-                </TableBody>
-              </Table>
+              {viewMode === 'table' ? (
+                <Table>
+                  {renderTableHeader()}
+                  <TableBody>
+                    {archivedForms.map(renderFormRow)}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="p-4">
+                  {renderFolderView(archivedForms)}
+                </div>
+              )}
             </CollapsibleContent>
           </Card>
         </Collapsible>

@@ -168,16 +168,15 @@ export default function PublicFormPage() {
   const signatureCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({})
   const signatureDrawingRef = useRef<Record<string, boolean>>({})
 
-  // Load form + optional edit response
+  // Load form: try local IndexedDB first, then server
   useEffect(() => {
     if (!formId) return
-    const found = getFormById(formId)
-    if (found) {
+
+    const initForm = (found: Form) => {
       setForm(found)
       if (found.defaultLanguage) setActiveLanguage(found.defaultLanguage)
       else if (found.languages?.length) setActiveLanguage(found.languages[0])
 
-      // Pre-fill from existing response if editing
       if (editResponseId) {
         const allResponses = getFormResponses()
         const existing = allResponses.find(r => r.id === editResponseId)
@@ -186,19 +185,35 @@ export default function PublicFormPage() {
         }
       }
 
-      // Init repeat counts from form's repeat groups
       if (found.repeatGroups?.length) {
         const counts: Record<string, number> = {}
         found.repeatGroups.forEach(rg => { counts[rg.id] = rg.repeatMin || 1 })
         setRepeatCounts(counts)
       }
 
-      // Audit: form open
       auditLogRef.current.push({ type: 'form_open', timestamp: new Date().toISOString() })
-    } else {
-      setNotFound(true)
     }
-    setLoading(false)
+
+    // Try local first
+    const found = getFormById(formId)
+    if (found) {
+      initForm(found)
+      setLoading(false)
+      return
+    }
+
+    // Not found locally — try server
+    fetch(`/api/forms?id=${encodeURIComponent(formId)}`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.success && data.form) {
+          initForm(data.form as Form)
+        } else {
+          setNotFound(true)
+        }
+      })
+      .catch(() => setNotFound(true))
+      .finally(() => setLoading(false))
   }, [formId, editResponseId])
 
   // ─── Computed values from calculated fields ───

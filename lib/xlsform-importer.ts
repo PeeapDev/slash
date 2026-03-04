@@ -30,6 +30,19 @@ const TYPE_MAP: Record<string, FormField['type']> = {
   calculate: 'calculate',
   range: 'range',
   acknowledge: 'note',
+  // ODK metadata types — auto-captured fields
+  start: 'dateTime',
+  end: 'dateTime',
+  today: 'date',
+  deviceid: 'text',
+  phonenumber: 'text',
+  username: 'text',
+  email: 'text',
+  simserial: 'text',
+  subscriberid: 'text',
+  audit: 'text',
+  'start-geopoint': 'gps',
+  'background-audio': 'file',
 }
 
 // ─── CSV / TSV parsing ───
@@ -539,6 +552,13 @@ export function importXLSForm(surveyText: string, choicesText: string): ImportRe
     }
     if (orOther) field.orOther = true
     if (choiceFilter) field.choiceFilterExpression = choiceFilter
+
+    // Mark ODK metadata fields as hidden (auto-captured at runtime)
+    const metadataTypes = ['start', 'end', 'today', 'deviceid', 'phonenumber', 'username', 'email', 'simserial', 'subscriberid', 'audit', 'start-geopoint', 'background-audio']
+    if (metadataTypes.includes(typeLower)) {
+      field.readOnly = true
+      field.metadata = typeLower as any
+    }
 
     // Range parameters from appearance (e.g., "picker" or params)
     if (fieldType === 'range') {

@@ -366,6 +366,12 @@ export default function OdkFormDesigner({ form, onClose, projectId }: OdkFormDes
     const published = publishForm(id)
     if (published) {
       setPublishStatus('published')
+      // Push to server so shared form links work
+      fetch('/api/forms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ form: published }),
+      }).catch(() => {}) // fire-and-forget
     }
   }, [formName, fields, saveForm])
 

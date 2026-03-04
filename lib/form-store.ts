@@ -97,6 +97,9 @@ export interface FormField {
   randomizeChoices?: boolean         // Fisher-Yates shuffle options before rendering
   // ── Multi-language ──
   translations?: Record<string, { label: string; hint?: string; guidanceHint?: string; options?: string[] }>
+  // ODK metadata — auto-captured fields (start, end, today, deviceid, etc.)
+  metadata?: 'start' | 'end' | 'today' | 'deviceid' | 'phonenumber' | 'username' | 'email' | 'simserial' | 'subscriberid' | 'audit' | 'start-geopoint' | 'background-audio'
+  name?: string  // original XLSForm field name
 }
 
 // ─── Group metadata (canonical location) ───
