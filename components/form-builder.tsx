@@ -206,6 +206,7 @@ export default function FormBuilder() {
   const [archivedOpen, setArchivedOpen] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState<FormTemplate | null>(null)
   const [aiDialogOpen, setAiDialogOpen] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'folder'>('folder')
   const [aiPrompt, setAiPrompt] = useState("")
@@ -1019,49 +1020,136 @@ export default function FormBuilder() {
         onImported={handleImported}
       />
 
-      {/* Template Dialog */}
-      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+      {/* Template Dialog — List or Detail View */}
+      <Dialog open={templateDialogOpen} onOpenChange={(open) => {
+        setTemplateDialogOpen(open)
+        if (!open) setSelectedTemplate(null)
+      }}>
         <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <LayoutTemplate className="h-5 w-5 text-emerald-600" />
-              Form Templates
-            </DialogTitle>
-            <DialogDescription>
-              Choose a template with pre-built fields, skip logic, and validation rules
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 py-2">
-            {FORM_TEMPLATES.map((tpl) => {
-              const Icon = tpl.icon
-              return (
-                <button
-                  key={tpl.id}
-                  onClick={() => handleUseTemplate(tpl)}
-                  className="flex items-start gap-4 rounded-lg border p-4 text-left hover:bg-muted/50 hover:border-primary/30 transition-colors"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
-                    <Icon className="h-5 w-5" />
+          {!selectedTemplate ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <LayoutTemplate className="h-5 w-5 text-emerald-600" />
+                  Form Templates
+                </DialogTitle>
+                <DialogDescription>
+                  Choose a template with pre-built fields, skip logic, and validation rules
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-3 py-2">
+                {FORM_TEMPLATES.map((tpl) => {
+                  const Icon = tpl.icon
+                  return (
+                    <button
+                      key={tpl.id}
+                      onClick={() => setSelectedTemplate(tpl)}
+                      className="flex items-start gap-4 rounded-lg border p-4 text-left hover:bg-muted/50 hover:border-primary/30 transition-colors"
+                    >
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{tpl.name}</p>
+                          <Badge variant="outline" className="text-[10px] shrink-0">
+                            {tpl.fields.length} fields
+                          </Badge>
+                          <Badge variant="outline" className={`text-[10px] shrink-0 ${
+                            tpl.type === 'survey' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                          }`}>
+                            {tpl.type}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">{tpl.description}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  {(() => { const Icon = selectedTemplate.icon; return <Icon className="h-5 w-5 text-emerald-600" /> })()}
+                  {selectedTemplate.name}
+                </DialogTitle>
+                <DialogDescription>{selectedTemplate.description}</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-2">
+                {/* Template Info */}
+                <div className="flex gap-2">
+                  <Badge variant="outline" className={
+                    selectedTemplate.type === 'survey' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                  }>
+                    {selectedTemplate.type === 'survey' ? 'Survey Form' : 'Sample Collection'}
+                  </Badge>
+                  <Badge variant="outline">{selectedTemplate.category}</Badge>
+                  <Badge variant="outline">{selectedTemplate.fields.length} fields</Badge>
+                  <Badge variant="outline">
+                    {selectedTemplate.fields.filter((f: any) => f.skipLogic).length} skip logic rules
+                  </Badge>
+                </div>
+
+                {/* Use Cases */}
+                <div>
+                  <h4 className="text-sm font-semibold mb-1">Best Used For</h4>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedTemplate.id === 'tpl-household' && 'Collecting household demographics, family composition, water and sanitation data, living conditions, and health status during door-to-door field visits.'}
+                    {selectedTemplate.id === 'tpl-health-screening' && 'Patient intake and screening at health facilities or mobile clinics. Captures vitals, symptoms, and referral decisions with pregnancy-aware logic.'}
+                    {selectedTemplate.id === 'tpl-sample-collection' && 'Lab sample tracking from collection point through chain of custody. Tracks barcode, quality, storage conditions, and rejection reasons.'}
+                    {selectedTemplate.id === 'tpl-maternal' && 'Antenatal care visits, postnatal follow-ups, child growth monitoring, and immunization tracking across multiple visit types.'}
+                    {selectedTemplate.id === 'tpl-community' && 'Village-level health infrastructure assessment. Maps health facilities, disease burden, water access, and sanitation coverage for community planning.'}
+                  </p>
+                </div>
+
+                {/* Fields Detail */}
+                <div>
+                  <h4 className="text-sm font-semibold mb-2">Form Fields</h4>
+                  <div className="border rounded-lg divide-y max-h-[300px] overflow-y-auto">
+                    {selectedTemplate.fields.map((field: any, i: number) => (
+                      <div key={field.id} className="px-3 py-2 text-sm flex items-start gap-3">
+                        <span className="text-xs text-muted-foreground w-5 shrink-0 mt-0.5">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{field.label}</span>
+                            {field.required && <span className="text-red-500 text-xs">*</span>}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <Badge variant="secondary" className="text-[10px] h-4">{field.type}</Badge>
+                            {field.skipLogic && (
+                              <Badge variant="outline" className="text-[10px] h-4 bg-amber-50 text-amber-700 border-amber-200">
+                                conditional
+                              </Badge>
+                            )}
+                            {field.validation && (
+                              <Badge variant="outline" className="text-[10px] h-4 bg-blue-50 text-blue-700 border-blue-200">
+                                {field.validation.min !== undefined ? `${field.validation.min}–${field.validation.max}` : 'validated'}
+                              </Badge>
+                            )}
+                            {field.options && (
+                              <span className="text-[10px] text-muted-foreground">{field.options.length} options</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm">{tpl.name}</p>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        {tpl.fields.length} fields
-                      </Badge>
-                      <Badge variant="outline" className={`text-[10px] shrink-0 ${
-                        tpl.type === 'survey' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
-                      }`}>
-                        {tpl.type}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{tpl.description}</p>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
-                </button>
-              )
-            })}
-          </div>
+                </div>
+              </div>
+              <DialogFooter className="gap-2">
+                <Button variant="outline" onClick={() => setSelectedTemplate(null)}>
+                  Back
+                </Button>
+                <Button onClick={() => handleUseTemplate(selectedTemplate)} className="gap-2 bg-emerald-600 hover:bg-emerald-700">
+                  <Plus className="h-4 w-4" />
+                  Use This Template
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
 

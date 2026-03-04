@@ -17,12 +17,11 @@ import {
   Loader2,
   AlertCircle
 } from "lucide-react"
-import { 
-  AIProvider, 
-  getAISettings, 
-  updateAIProvider, 
-  testAIProvider,
-  saveAISettings 
+import {
+  AIProvider,
+  getAISettings,
+  updateAIProvider,
+  saveAISettings
 } from "@/lib/ai-store"
 
 export default function AICredentials() {
@@ -94,14 +93,38 @@ export default function AICredentials() {
     setTesting(prev => ({ ...prev, [provider.id]: true }))
 
     try {
-      // Use the current key directly
-      const providerWithKey = { ...provider, apiKey: currentKey }
-      const result = await testAIProvider(providerWithKey)
+      // Direct fetch to test endpoint — bypass store to ensure key is sent exactly
+      const response = await fetch('/api/ai/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId: provider.id,
+          apiKey: currentKey,
+        }),
+      })
+
+      const data = await response.json().catch(() => null)
+      const success = response.ok && data?.success
+      const message = success
+        ? (data?.message || 'Connection successful')
+        : (data?.error || `Test failed (HTTP ${response.status})`)
+
+      updateAIProvider(provider.id, {
+        testStatus: success ? 'success' : 'failed',
+        testMessage: message,
+        lastTested: new Date().toISOString(),
+      })
 
       const settings = getAISettings()
       setProviders(settings.providers)
     } catch (error) {
-      console.error('Test failed:', error)
+      updateAIProvider(provider.id, {
+        testStatus: 'failed',
+        testMessage: `Network error: ${error instanceof Error ? error.message : 'Failed to connect'}`,
+        lastTested: new Date().toISOString(),
+      })
+      const settings = getAISettings()
+      setProviders(settings.providers)
     } finally {
       setTesting(prev => ({ ...prev, [provider.id]: false }))
     }

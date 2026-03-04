@@ -2,90 +2,133 @@ import { NextRequest, NextResponse } from "next/server"
 
 type ProviderId = "openai" | "claude" | "deepseek" | "groq"
 
-const jsonError = (status: number, error: string) =>
-  NextResponse.json({ success: false, error }, { status })
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { providerId, apiKey: rawBodyKey } = body as { providerId: ProviderId; apiKey?: string }
-    const bodyKey = rawBodyKey?.trim()
+    const { providerId, apiKey: rawKey } = body as { providerId: ProviderId; apiKey?: string }
 
-    if (!providerId) return jsonError(400, "Missing providerId")
+    if (!providerId) {
+      return NextResponse.json({ success: false, error: "Missing providerId" }, { status: 400 })
+    }
 
-    // ONLY use the key provided in the request body
-    // Env vars are NOT used for test — this ensures the user's entered key is tested
-    const apiKey = bodyKey
-    if (!apiKey) return jsonError(400, "No API key provided. Please enter and save your key first.")
+    const apiKey = rawKey?.trim()
+    if (!apiKey) {
+      return NextResponse.json({
+        success: false,
+        error: "No API key provided. Please enter your key and click Save first."
+      }, { status: 400 })
+    }
 
-    // Validate key format
-    if (providerId === "claude" && !apiKey.startsWith("sk-ant-")) {
-      return jsonError(400, "Invalid Claude key format. Anthropic keys start with 'sk-ant-'. Check that you entered the correct key for Claude.")
-    }
-    if (providerId === "groq" && !apiKey.startsWith("gsk_")) {
-      return jsonError(400, "Invalid Groq key format. Groq keys start with 'gsk_'. Check that you entered the correct key.")
-    }
-    if (providerId === "openai" && !apiKey.startsWith("sk-")) {
-      return jsonError(400, "Invalid OpenAI key format. OpenAI keys start with 'sk-'. Check that you entered the correct key.")
-    }
+    // Diagnostic info for debugging
+    const keyPrefix = apiKey.substring(0, 6)
+    const keyLength = apiKey.length
+    const diag = `[key: ${keyPrefix}...${apiKey.substring(apiKey.length - 4)}, len: ${keyLength}]`
 
     if (providerId === "claude") {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      if (!apiKey.startsWith("sk-ant-")) {
+        return NextResponse.json({
+          success: false,
+          error: `Key doesn't start with 'sk-ant-'. Got prefix: "${keyPrefix}". Make sure you're using a Claude/Anthropic key.`
+        }, { status: 400 })
+      }
+
+      try {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model: "claude-haiku-4-5-20251001",
+            max_tokens: 10,
+            messages: [{ role: "user", content: "Hi" }],
+          }),
+        })
+
+        if (!res.ok) {
+          const errText = await res.text()
+          let parsed: any = null
+          try { parsed = JSON.parse(errText) } catch {}
+          const msg = parsed?.error?.message || errText
+          return NextResponse.json({
+            success: false,
+            error: `Anthropic returned ${res.status}: ${msg} ${diag}`
+          }, { status: res.status })
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Claude connection successful ${diag}`,
+          provider: "claude"
+        })
+      } catch (fetchErr) {
+        return NextResponse.json({
+          success: false,
+          error: `Network error calling Anthropic: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)} ${diag}`
+        }, { status: 502 })
+      }
+    }
+
+    // OpenAI-compatible providers (OpenAI, DeepSeek, Groq)
+    const config: Record<string, { url: string; model: string; prefix?: string }> = {
+      openai: { url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini", prefix: "sk-" },
+      deepseek: { url: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
+      groq: { url: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.1-8b-instant", prefix: "gsk_" },
+    }
+
+    const providerConfig = config[providerId]
+    if (!providerConfig) {
+      return NextResponse.json({ success: false, error: `Unknown provider: ${providerId}` }, { status: 400 })
+    }
+
+    if (providerConfig.prefix && !apiKey.startsWith(providerConfig.prefix)) {
+      return NextResponse.json({
+        success: false,
+        error: `Key doesn't start with '${providerConfig.prefix}'. Got prefix: "${keyPrefix}". Make sure you're using the correct key for ${providerId}.`
+      }, { status: 400 })
+    }
+
+    try {
+      const res = await fetch(providerConfig.url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+          "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "claude-haiku-4-5-20251001",
-          max_tokens: 30,
-          messages: [{ role: "user", content: "Say 'test ok'" }],
-          temperature: 0,
+          model: providerConfig.model,
+          messages: [{ role: "user", content: "Hi" }],
+          max_tokens: 10,
         }),
       })
+
       if (!res.ok) {
-        const text = await res.text()
-        return jsonError(res.status, `Claude API error: ${text}`)
+        const errText = await res.text()
+        let parsed: any = null
+        try { parsed = JSON.parse(errText) } catch {}
+        const msg = parsed?.error?.message || errText
+        return NextResponse.json({
+          success: false,
+          error: `${providerId} returned ${res.status}: ${msg} ${diag}`
+        }, { status: res.status })
       }
-      return NextResponse.json({ success: true, message: "Connection successful", provider: "claude" })
-    }
 
-    // OpenAI-compatible providers
-    const urls: Record<string, string> = {
-      openai: "https://api.openai.com/v1/chat/completions",
-      deepseek: "https://api.deepseek.com/v1/chat/completions",
-      groq: "https://api.groq.com/openai/v1/chat/completions",
+      return NextResponse.json({
+        success: true,
+        message: `${providerId} connection successful ${diag}`,
+        provider: providerId
+      })
+    } catch (fetchErr) {
+      return NextResponse.json({
+        success: false,
+        error: `Network error calling ${providerId}: ${fetchErr instanceof Error ? fetchErr.message : String(fetchErr)} ${diag}`
+      }, { status: 502 })
     }
-    const models: Record<string, string> = {
-      openai: "gpt-4o-mini",
-      deepseek: "deepseek-chat",
-      groq: "llama-3.1-8b-instant",
-    }
-
-    const res = await fetch(urls[providerId], {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: models[providerId],
-        messages: [{ role: "user", content: "Say 'test ok'" }],
-        max_tokens: 30,
-        temperature: 0,
-      }),
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      return jsonError(res.status, `${providerId} API error: ${text}`)
-    }
-
-    return NextResponse.json({ success: true, message: "Connection successful", provider: providerId })
   } catch (error) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : "Test failed" },
+      { success: false, error: `Server error: ${error instanceof Error ? error.message : "Unknown"}` },
       { status: 500 }
     )
   }

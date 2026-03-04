@@ -118,7 +118,10 @@ export default function OdkDashboardPage() {
         </Card>
 
         {/* Forms */}
-        <Card className="p-3 lg:p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800">
+        <Card
+          className="p-3 lg:p-6 bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border-green-200 dark:border-green-800 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => navigate({ view: "form-builder" })}
+        >
           <div className="flex items-center gap-2 mb-1">
             <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
             <span className="text-xs lg:text-sm text-green-700 dark:text-green-300 font-medium">
@@ -131,7 +134,10 @@ export default function OdkDashboardPage() {
         </Card>
 
         {/* Total Submissions */}
-        <Card className="p-3 lg:p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
+        <Card
+          className="p-3 lg:p-6 bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => navigate({ view: "submissions" })}
+        >
           <div className="flex items-center gap-2 mb-1">
             <Inbox className="h-4 w-4 text-purple-600 dark:text-purple-400" />
             <span className="text-xs lg:text-sm text-purple-700 dark:text-purple-300 font-medium">
@@ -144,7 +150,10 @@ export default function OdkDashboardPage() {
         </Card>
 
         {/* Pending Review */}
-        <Card className="p-3 lg:p-6 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800">
+        <Card
+          className="p-3 lg:p-6 bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800 cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => navigate({ view: "submissions" })}
+        >
           <div className="flex items-center gap-2 mb-1">
             <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
             <span className="text-xs lg:text-sm text-amber-700 dark:text-amber-300 font-medium">

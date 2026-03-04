@@ -33,7 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { Plus, MoreHorizontal, Pencil, Users, AlertCircle } from "lucide-react"
+import { Plus, MoreHorizontal, Pencil, Users, AlertCircle, Loader2 } from "lucide-react"
 import { format } from "date-fns"
 import { ROLE_DEFINITIONS, type TeamRole, getRoleColor } from "@/lib/team-roles"
 
@@ -65,6 +65,8 @@ export default function WebUsersTab({ filterRoles }: WebUsersTabProps) {
   const [displayName, setDisplayName] = useState("")
   const [password, setPassword] = useState("")
   const [role, setRole] = useState<TeamRole>(filterRoles?.[0] || "field_collector")
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState("")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -100,6 +102,13 @@ export default function WebUsersTab({ filterRoles }: WebUsersTabProps) {
 
   const handleCreate = async () => {
     if (!email.trim() || !displayName.trim() || !password.trim()) return
+    if (password.trim().length < 6) {
+      setCreateError("Password must be at least 6 characters")
+      return
+    }
+
+    setCreating(true)
+    setCreateError("")
 
     try {
       const response = await fetch('/api/users', {
@@ -116,10 +125,15 @@ export default function WebUsersTab({ filterRoles }: WebUsersTabProps) {
       if (data.success) {
         resetForm()
         setCreateOpen(false)
+        setCreateError("")
         load()
+      } else {
+        setCreateError(data.error || `Failed to create user (${response.status})`)
       }
     } catch (e) {
-      console.error('Failed to create user:', e)
+      setCreateError(e instanceof Error ? e.message : 'Network error — could not reach server')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -261,9 +275,15 @@ export default function WebUsersTab({ filterRoles }: WebUsersTabProps) {
                 type="password"
                 placeholder="Minimum 6 characters"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => { setPassword(e.target.value); setCreateError("") }}
               />
             </div>
+            {createError && (
+              <div className="flex items-start gap-2 p-3 text-sm text-red-700 bg-red-50 dark:bg-red-950/30 dark:text-red-400 rounded-lg">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>{createError}</span>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Role</Label>
               <Select value={role} onValueChange={(v) => setRole(v as TeamRole)}>
@@ -284,9 +304,13 @@ export default function WebUsersTab({ filterRoles }: WebUsersTabProps) {
             </Button>
             <Button
               onClick={handleCreate}
-              disabled={!email.trim() || !displayName.trim() || !password.trim()}
+              disabled={!email.trim() || !displayName.trim() || !password.trim() || creating}
             >
-              Create
+              {creating ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Creating...</>
+              ) : (
+                'Create'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
