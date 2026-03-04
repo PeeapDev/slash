@@ -43,13 +43,14 @@ export class AuthService {
         .eq('id', authData.user.id)
         .single()
 
-      await LogService.logAction({
+      // Fire-and-forget — don't block registration on logging
+      LogService.logAction({
         userId: authData.user.id,
         action: 'USER_REGISTERED',
         entityType: 'user',
         entityId: authData.user.id,
         details: { email, role, region: regionId, district: districtId },
-      })
+      }).catch(() => {})
 
       return {
         success: true,
@@ -70,27 +71,37 @@ export class AuthService {
     try {
       const sb = getSupabaseClient()
 
-      const { data: authData, error: authError } = await sb.auth.signInWithPassword({ email, password })
+      // Timeout wrapper to prevent Vercel function hangs
+      const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+        Promise.race([
+          promise,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Request timed out')), ms)),
+        ])
+
+      const { data: authData, error: authError } = await withTimeout(
+        sb.auth.signInWithPassword({ email, password }),
+        8000
+      )
 
       if (authError) throw new Error(`Authentication failed: ${authError.message}`)
 
       // Get profile from users_profile
-      const { data: profile, error: profileError } = await sb
-        .from('users_profile')
-        .select('*')
-        .eq('id', authData.user.id)
-        .single()
+      const { data: profile, error: profileError } = await withTimeout(
+        sb.from('users_profile').select('*').eq('id', authData.user.id).single(),
+        5000
+      )
 
       if (profileError) throw new Error('User profile not found')
       if (!profile.is_active) throw new Error('User account is inactive')
 
-      await LogService.logAction({
+      // Fire-and-forget — don't block login on logging
+      LogService.logAction({
         userId: profile.id,
         action: 'USER_LOGIN',
         entityType: 'user',
         entityId: profile.id,
         details: { email, loginTime: new Date().toISOString() },
-      })
+      }).catch(() => {})
 
       return {
         success: true,
@@ -135,23 +146,32 @@ export class AuthService {
     }
   }
 
-  // Get current session + profile
+  // Get current session + profile (with 5s timeout to avoid hanging)
   static async getCurrentSession() {
     try {
       if (!isSupabaseConfigured()) {
         return { success: false, message: 'Supabase not configured' }
       }
 
-      const { data: { session }, error } = await supabase!.auth.getSession()
+      const timeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+        Promise.race([
+          promise,
+          new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Timeout')), ms)),
+        ])
+
+      const { data: { session }, error } = await timeout(supabase!.auth.getSession(), 5000)
 
       if (error) throw new Error(`Session error: ${error.message}`)
       if (!session) return { success: false, message: 'No active session' }
 
-      const { data: profile } = await supabase!
-        .from('users_profile')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
+      const { data: profile } = await timeout(
+        supabase!
+          .from('users_profile')
+          .select('*')
+          .eq('id', session.user.id)
+          .single(),
+        5000
+      )
 
       return {
         success: true,

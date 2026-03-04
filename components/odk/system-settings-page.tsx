@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Settings, Paintbrush, RefreshCw, Brain, Shield, Database, Smartphone, FileText, Activity } from "lucide-react"
+import { Settings, Paintbrush, RefreshCw, Brain, Shield, Database, Smartphone, FileText, Activity, Lock } from "lucide-react"
 import BrandingSettings from "@/components/branding-settings"
 import SyncSettings from "@/components/sync-settings"
 import AICredentials from "@/components/ai-credentials"
@@ -14,6 +14,7 @@ import SyncStatus from "@/components/sync-status"
 import SyncDiagnostic from "@/components/sync-diagnostic"
 import RolesPermissions from "@/components/odk/settings-roles-tab"
 import GeneralSettings from "@/components/odk/settings-general-tab"
+import EncryptionSettings from "@/components/encryption-settings"
 
 const tabs = [
   { id: "general", label: "General", icon: Settings },
@@ -22,6 +23,7 @@ const tabs = [
   { id: "ai", label: "AI Integration", icon: Brain },
   { id: "sync", label: "Sync & Data", icon: RefreshCw },
   { id: "database", label: "Database", icon: Database },
+  { id: "encryption", label: "Encryption", icon: Lock },
   { id: "pwa", label: "PWA", icon: Smartphone },
   { id: "logs", label: "System Logs", icon: FileText },
 ] as const
@@ -87,6 +89,7 @@ export default function SystemSettingsPage() {
             {activeTab === "ai" && <AiIntegrationTab />}
             {activeTab === "sync" && <SyncTab />}
             {activeTab === "database" && <DatabaseTab />}
+            {activeTab === "encryption" && <EncryptionTab />}
             {activeTab === "pwa" && <PwaTab />}
             {activeTab === "logs" && <LogsTab />}
           </div>
@@ -140,6 +143,18 @@ function DatabaseTab() {
       </div>
       <DatabaseSetup />
       <DualDatabaseDemo />
+    </div>
+  )
+}
+
+function EncryptionTab() {
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold">Encryption</h2>
+        <p className="text-sm text-muted-foreground mt-1">Protect sensitive data with AES-256-GCM encryption at rest.</p>
+      </div>
+      <EncryptionSettings />
     </div>
   )
 }

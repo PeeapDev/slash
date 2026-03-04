@@ -338,6 +338,20 @@ export interface Team extends BaseRecord {
   createdBy: string
 }
 
+// Attachment Interface (Images/Files)
+export interface Attachment extends BaseRecord {
+  fileName: string
+  mimeType: string
+  fileSize: number
+  data: ArrayBuffer
+  thumbnail?: ArrayBuffer
+  uploadStatus: 'pending' | 'uploading' | 'uploaded' | 'error'
+  remoteUrl?: string
+  parentStore?: string
+  parentId?: string
+  errorMessage?: string
+}
+
 // IndexedDB Schema Definition
 export interface OfflineDBSchema {
   households: Household[]
@@ -355,12 +369,13 @@ export interface OfflineDBSchema {
   audit_trails: AuditTrail[]
   settings: Settings[]
   app_settings: any[]
+  attachments: Attachment[]
 }
 
 // Offline-First Database Service
 class OfflineFirstDB {
   private dbName = 'SLASH_FIELDWORK_DB'
-  private dbVersion = 7 // Increased for app_settings store
+  private dbVersion = 8 // v8: added attachments store
   private db: IDBDatabase | null = null
   private deviceId: string
   private collectorId: string
@@ -398,7 +413,8 @@ class OfflineFirstDB {
           'households', 'participants', 'surveys', 'samples',
           'forms', 'form_responses', 'project_metadata',
           'sample_types', 'lab_results', 'team_members', 'teams',
-          'sync_queue', 'audit_trails', 'settings', 'app_settings'
+          'sync_queue', 'audit_trails', 'settings', 'app_settings',
+          'attachments'
         ]
 
         storeNames.forEach(storeName => {
@@ -449,6 +465,11 @@ class OfflineFirstDB {
               store.createIndex('leaderId', 'leaderId')
               store.createIndex('isActive', 'isActive')
               store.createIndex('regionId', 'regionId')
+            } else if (storeName === 'attachments') {
+              store.createIndex('uploadStatus', 'uploadStatus')
+              store.createIndex('parentStore', 'parentStore')
+              store.createIndex('parentId', 'parentId')
+              store.createIndex('mimeType', 'mimeType')
             }
           }
         })
