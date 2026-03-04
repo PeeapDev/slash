@@ -60,14 +60,15 @@ export default function AICredentials() {
   }
 
   const saveKey = (providerId: string) => {
-    const newKey = tempKeys[providerId] || ''
-    const updatedProvider = updateAIProvider(providerId, { 
+    const newKey = (tempKeys[providerId] || '').trim()
+    setTempKeys(prev => ({ ...prev, [providerId]: newKey }))
+    const updatedProvider = updateAIProvider(providerId, {
       apiKey: newKey,
       testStatus: 'untested',
       testMessage: undefined,
       lastTested: undefined
     })
-    
+
     setProviders(updatedProvider.providers)
   }
 

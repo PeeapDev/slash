@@ -1,3 +1,4 @@
+import * as XLSX from 'xlsx'
 import type {
   Form,
   FormField,
@@ -601,7 +602,7 @@ export function importXLSForm(surveyText: string, choicesText: string): ImportRe
   return { form, warnings }
 }
 
-// ─── Preview helper (for UI) ───
+// ─── Preview helper (for UI — text paste mode) ───
 
 export function previewXLSForm(surveyText: string, choicesText: string): {
   fieldCount: number
@@ -631,6 +632,99 @@ export function previewXLSForm(surveyText: string, choicesText: string): {
       groupCount: 0,
       repeatGroupCount: 0,
       warnings: [e.message || 'Failed to parse'],
+      languages: [],
+      fieldTypes: {},
+    }
+  }
+}
+
+// ─── Excel (.xlsx) file helpers ───
+
+function sheetToTSV(sheet: XLSX.WorkSheet): string {
+  return XLSX.utils.sheet_to_csv(sheet, { FS: '\t' })
+}
+
+async function readXLSXFile(file: File): Promise<XLSX.WorkBook> {
+  const buffer = await file.arrayBuffer()
+  return XLSX.read(buffer, { type: 'array' })
+}
+
+function findSheet(wb: XLSX.WorkBook, names: string[]): XLSX.WorkSheet | null {
+  for (const name of names) {
+    const found = wb.SheetNames.find(s => s.toLowerCase() === name.toLowerCase())
+    if (found) return wb.Sheets[found]
+  }
+  return null
+}
+
+// ─── Import from .xlsx file ───
+
+export async function importXLSFormFromFile(file: File): Promise<ImportResult> {
+  const wb = await readXLSXFile(file)
+
+  const surveySheet = findSheet(wb, ['survey'])
+  if (!surveySheet) {
+    throw new Error(`No "survey" sheet found. Found sheets: ${wb.SheetNames.join(', ')}`)
+  }
+
+  const choicesSheet = findSheet(wb, ['choices', 'external_choices'])
+  const settingsSheet = findSheet(wb, ['settings'])
+
+  const surveyTSV = sheetToTSV(surveySheet)
+  const choicesTSV = choicesSheet ? sheetToTSV(choicesSheet) : ''
+
+  const result = importXLSForm(surveyTSV, choicesTSV)
+
+  // Extract form name from settings sheet if available
+  if (settingsSheet) {
+    const settingsTSV = sheetToTSV(settingsSheet)
+    const { rows } = parseSheet(settingsTSV)
+    if (rows.length > 0) {
+      const title = rows[0]['form_title'] || rows[0]['title'] || ''
+      const formId = rows[0]['form_id'] || rows[0]['id_string'] || ''
+      if (title) result.form.name = title
+      else if (formId) result.form.name = formId
+    }
+  }
+
+  // Use filename as fallback
+  if (result.form.name === 'Imported Form') {
+    result.form.name = file.name.replace(/\.(xlsx|xls)$/i, '')
+  }
+
+  return result
+}
+
+// ─── Preview from .xlsx file ───
+
+export async function previewXLSFormFromFile(file: File): Promise<{
+  fieldCount: number
+  groupCount: number
+  repeatGroupCount: number
+  warnings: string[]
+  languages: string[]
+  fieldTypes: Record<string, number>
+}> {
+  try {
+    const result = await importXLSFormFromFile(file)
+    const fieldTypes: Record<string, number> = {}
+    for (const f of result.form.fields) {
+      fieldTypes[f.type] = (fieldTypes[f.type] || 0) + 1
+    }
+    return {
+      fieldCount: result.form.fields.length,
+      groupCount: result.form.groups?.length || 0,
+      repeatGroupCount: result.form.repeatGroups?.length || 0,
+      warnings: result.warnings,
+      languages: result.form.languages || [],
+      fieldTypes,
+    }
+  } catch (e: any) {
+    return {
+      fieldCount: 0,
+      groupCount: 0,
+      repeatGroupCount: 0,
+      warnings: [e.message || 'Failed to parse file'],
       languages: [],
       fieldTypes: {},
     }

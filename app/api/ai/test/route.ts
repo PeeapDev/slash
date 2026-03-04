@@ -8,7 +8,8 @@ const jsonError = (status: number, error: string) =>
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { providerId, apiKey: bodyKey } = body as { providerId: ProviderId; apiKey?: string }
+    const { providerId, apiKey: rawBodyKey } = body as { providerId: ProviderId; apiKey?: string }
+    const bodyKey = rawBodyKey?.trim()
 
     if (!providerId) return jsonError(400, "Missing providerId")
 
