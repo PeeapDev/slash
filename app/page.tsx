@@ -8,38 +8,26 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ThemeToggle } from "@/components/theme-toggle"
 import { Activity, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
 
 export default function Home() {
-  const { user, isAuthenticated, isLoading, supabaseConfigured, logout } = useAuth()
+  const { user, isAuthenticated, supabaseConfigured, logout } = useAuth()
 
-  // Supabase not configured → offline mode with IndexedDB local auth
+  // Supabase not configured → offline mode
   if (!supabaseConfigured) {
     return <OfflineHome />
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+  // Authenticated → dashboard
+  if (isAuthenticated && user) {
+    return <AuthenticatedApp user={user} logout={logout} />
   }
 
-  // Not authenticated → show login inline (no redirect — avoids loops)
-  if (!isAuthenticated) {
-    return <InlineLogin />
-  }
-
-  return <AuthenticatedApp user={user!} logout={logout} />
+  // Not authenticated (or still loading) → show login form immediately
+  return <InlineLogin />
 }
 
-// Authenticated dashboard — extracted to avoid conditional hook issues
 function AuthenticatedApp({ user, logout }: { user: NonNullable<ReturnType<typeof useAuth>['user']>; logout: () => Promise<void> }) {
   const handleLogout = useCallback(async () => {
     await logout()
@@ -62,7 +50,6 @@ function AuthenticatedApp({ user, logout }: { user: NonNullable<ReturnType<typeo
   )
 }
 
-// Inline login form rendered directly on "/" — no redirect needed
 function InlineLogin() {
   const { login } = useAuth()
   const [email, setEmail] = useState("")
@@ -81,7 +68,6 @@ function InlineLogin() {
       if (!result.success) {
         setError(result.error || "Login failed")
       }
-      // On success, auth context updates → parent re-renders → dashboard shows
     } catch {
       setError("An unexpected error occurred")
     } finally {
@@ -91,10 +77,6 @@ function InlineLogin() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center p-4">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-2">
@@ -168,7 +150,7 @@ function InlineLogin() {
 
 function OfflineHome() {
   const [localUser, setLocalUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     (async () => {
@@ -176,7 +158,7 @@ function OfflineHome() {
         const storedUser = await indexedDBService.get<{ id: string; name: string; role: string }>('app_settings', 'current_user')
         if (storedUser) setLocalUser(storedUser)
       } catch { /* ignore */ }
-      setLoading(false)
+      setReady(true)
     })()
   }, [])
 
@@ -191,15 +173,8 @@ function OfflineHome() {
     try { await indexedDBService.delete('app_settings', 'current_user') } catch { /* ignore */ }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    )
+  if (!ready) {
+    return <InlineLogin />
   }
 
   if (!localUser) {

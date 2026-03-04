@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (profile) setUser(profile)
   }, [sb, session, fetchProfile])
 
-  // Initialize: check existing session
+  // Initialize: check existing session with timeout
   useEffect(() => {
     if (!sb) {
       setIsLoading(false)
@@ -114,6 +114,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let mounted = true
+
+    // Hard timeout — never let loading hang more than 3 seconds
+    const timeout = setTimeout(() => {
+      if (mounted && isLoading) {
+        console.warn('Auth init timeout — forcing isLoading=false')
+        setIsLoading(false)
+      }
+    }, 3000)
 
     const init = async () => {
       try {
@@ -129,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.error('Auth init failed:', e)
       } finally {
         if (mounted) setIsLoading(false)
+        clearTimeout(timeout)
       }
     }
 
@@ -149,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
   }, [sb, fetchProfile])
