@@ -372,18 +372,71 @@ class OdkStore {
     return [header, ...rows].join("\n")
   }
 
-  // ─── Seed Data (no fake submissions — only real data shows in dashboard) ───
+  // ─── Clean out legacy fake/demo data from IndexedDB ───
 
-  async seed(): Promise<void> {
-    // No-op: we no longer seed fake data.
-    // Projects are created by users via the UI.
-    // Submissions come from real form fills.
+  async cleanFakeData(): Promise<void> {
+    if (!this.db) return
+
+    const fakeFormIds = new Set(["FORM-001", "FORM-002"])
+    const fakeProjectIds = new Set(["proj-odk-001", "proj-odk-002"])
+    const fakeNames = new Set([
+      "Alice Mugo", "Brian Wanjiku", "Cynthia Odhiambo", "David Kimani",
+      "Esther Nyambura", "Faith Achieng", "Grace Wambui", "Hassan Omar",
+      "John Kamau", "Lilian Chebet", "Michael Otieno", "Nancy Njeri",
+      "Peter Omondi", "Rose Muthoni", "Samuel Kiprop",
+    ])
+
+    try {
+      // Delete fake submissions (by formId or projectId)
+      const allSubs = await this._getAll<OdkSubmission>(STORES.submissions)
+      for (const sub of allSubs) {
+        if (fakeFormIds.has(sub.formId) || fakeProjectIds.has(sub.projectId) || fakeNames.has(sub.submitter)) {
+          await this._delete(STORES.submissions, sub.id)
+        }
+      }
+
+      // Delete fake projects
+      const allProjects = await this._getAll<OdkProject>(STORES.projects)
+      for (const proj of allProjects) {
+        if (fakeProjectIds.has(proj.id) || proj.name === "Kenya Health Survey 2024" || proj.name === "Water Quality Monitoring") {
+          await this._delete(STORES.projects, proj.id)
+        }
+      }
+
+      // Delete fake app users
+      const allAppUsers = await this._getAll<OdkAppUser>(STORES.appUsers)
+      for (const user of allAppUsers) {
+        if (fakeNames.has(user.displayName)) {
+          await this._delete(STORES.appUsers, user.id)
+        }
+      }
+
+      // Delete fake web users
+      const allWebUsers = await this._getAll<OdkWebUser>(STORES.webUsers)
+      for (const user of allWebUsers) {
+        if (fakeNames.has(user.displayName)) {
+          await this._delete(STORES.webUsers, user.id)
+        }
+      }
+
+      // Delete fake comments tied to fake submissions
+      const allComments = await this._getAll<OdkComment>(STORES.comments)
+      const remainingSubs = await this._getAll<OdkSubmission>(STORES.submissions)
+      const realSubIds = new Set(remainingSubs.map(s => s.id))
+      for (const comment of allComments) {
+        if (!realSubIds.has(comment.submissionId)) {
+          await this._delete(STORES.comments, comment.id)
+        }
+      }
+    } catch (e) {
+      console.warn("Fake data cleanup (non-critical):", e)
+    }
   }
 }
 
 export const odkStore = new OdkStore()
 
-// Auto-init and seed
+// Auto-init and clean fake data
 if (typeof window !== "undefined") {
-  odkStore.init().then(() => odkStore.seed())
+  odkStore.init().then(() => odkStore.cleanFakeData())
 }

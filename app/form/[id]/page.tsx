@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import type { Form, FormField, FormGroupMeta } from "@/lib/form-store"
-import { getFormById, getFormResponses, saveFormResponses, updateFormResponse } from "@/lib/form-store"
+import { getFormById, getFormResponses, saveFormResponses, updateFormResponse, waitForHydration } from "@/lib/form-store"
 import {
   evaluateRelevance,
   validateFieldConstraints,
@@ -168,9 +168,10 @@ export default function PublicFormPage() {
   const signatureCanvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({})
   const signatureDrawingRef = useRef<Record<string, boolean>>({})
 
-  // Load form: try local IndexedDB first, then server
+  // Load form: wait for IndexedDB hydration, try local, then server
   useEffect(() => {
     if (!formId) return
+    let cancelled = false
 
     const initForm = (found: Form) => {
       setForm(found)
@@ -194,26 +195,37 @@ export default function PublicFormPage() {
       auditLogRef.current.push({ type: 'form_open', timestamp: new Date().toISOString() })
     }
 
-    // Try local first
-    const found = getFormById(formId)
-    if (found) {
-      initForm(found)
-      setLoading(false)
-      return
-    }
+    ;(async () => {
+      // Wait for IndexedDB cache to be ready
+      await waitForHydration()
+      if (cancelled) return
 
-    // Not found locally — try server
-    fetch(`/api/forms?id=${encodeURIComponent(formId)}`)
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
+      // Try local first
+      const found = getFormById(formId)
+      if (found) {
+        initForm(found)
+        setLoading(false)
+        return
+      }
+
+      // Not found locally — try server
+      try {
+        const res = await fetch(`/api/forms?id=${encodeURIComponent(formId)}`)
+        if (cancelled) return
+        const data = res.ok ? await res.json() : null
         if (data?.success && data.form) {
           initForm(data.form as Form)
         } else {
           setNotFound(true)
         }
-      })
-      .catch(() => setNotFound(true))
-      .finally(() => setLoading(false))
+      } catch {
+        if (!cancelled) setNotFound(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
+
+    return () => { cancelled = true }
   }, [formId, editResponseId])
 
   // ─── Computed values from calculated fields ───

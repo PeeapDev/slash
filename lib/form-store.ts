@@ -5,23 +5,53 @@ let _formsCache: Form[] | null = null
 let _responsesCache: FormResponse[] | null = null
 let _hydrated = false
 
+// Known fake/demo IDs to strip on hydration
+const FAKE_FORM_IDS = new Set(['FORM-001', 'FORM-002'])
+
+// Promise that resolves when IndexedDB hydration is complete
+let _hydrateResolve: () => void
+const _hydratePromise = new Promise<void>(resolve => { _hydrateResolve = resolve })
+
+/** Wait for IndexedDB hydration to finish (safe to call multiple times). */
+export function waitForHydration(): Promise<void> {
+  if (_hydrated) return Promise.resolve()
+  return _hydratePromise
+}
+
 // Hydrate cache from IndexedDB on module load (browser only)
 if (typeof window !== 'undefined') {
   (async () => {
     try {
       const idbForms = await indexedDBService.getAll<Form>('forms')
       if (idbForms && idbForms.length > 0 && !_formsCache) {
-        _formsCache = idbForms
+        // Filter out legacy demo forms
+        const clean = idbForms.filter(f => !FAKE_FORM_IDS.has(f.id))
+        _formsCache = clean
+        // Persist cleaned list if we removed anything
+        if (clean.length !== idbForms.length) {
+          persistFormsToIDB(clean)
+        }
       }
       const idbResponses = await indexedDBService.getAll<FormResponse>('form_responses')
       if (idbResponses && idbResponses.length > 0 && !_responsesCache) {
-        _responsesCache = idbResponses
+        // Filter out responses linked to demo forms
+        const clean = idbResponses.filter(r => !FAKE_FORM_IDS.has(r.formId))
+        _responsesCache = clean
+        if (clean.length !== idbResponses.length) {
+          persistResponsesToIDB(clean)
+        }
       }
       _hydrated = true
+      _hydrateResolve()
     } catch (e) {
       console.warn('IndexedDB hydration failed, using fallback:', e)
+      _hydrated = true
+      _hydrateResolve()
     }
   })()
+} else {
+  _hydrated = true
+  _hydrateResolve!()
 }
 
 function persistFormsToIDB(forms: Form[]) {

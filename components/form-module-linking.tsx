@@ -49,8 +49,8 @@ export default function FormModuleLinking({ moduleType, moduleId, onClose }: Mod
     })
     setAvailableForms(relevantForms)
 
-    // Mock: Load existing linked forms (in real implementation, this would come from API)
-    setLinkedForms(['FORM-001']) // Example: FORM-001 is already linked
+    // Start empty — linked forms come from real user actions
+    setLinkedForms([])
   }, [moduleType])
 
   const getModuleIcon = () => {

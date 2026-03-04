@@ -19,11 +19,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Diagnostic info for debugging
-    const keyPrefix = apiKey.substring(0, 6)
+    // Diagnostic info
+    const keyPrefix = apiKey.substring(0, 8)
+    const keyEnd = apiKey.substring(apiKey.length - 4)
     const keyLength = apiKey.length
-    const diag = `[key: ${keyPrefix}...${apiKey.substring(apiKey.length - 4)}, len: ${keyLength}]`
+    const diag = `[key: ${keyPrefix}...${keyEnd}, len: ${keyLength}]`
 
+    // ─── Claude / Anthropic ───
     if (providerId === "claude") {
       if (!apiKey.startsWith("sk-ant-")) {
         return NextResponse.json({
@@ -42,8 +44,8 @@ export async function POST(request: NextRequest) {
           },
           body: JSON.stringify({
             model: "claude-haiku-4-5-20251001",
-            max_tokens: 10,
-            messages: [{ role: "user", content: "Hi" }],
+            max_tokens: 5,
+            messages: [{ role: "user", content: "test" }],
           }),
         })
 
@@ -58,11 +60,7 @@ export async function POST(request: NextRequest) {
           }, { status: res.status })
         }
 
-        return NextResponse.json({
-          success: true,
-          message: `Claude connection successful ${diag}`,
-          provider: "claude"
-        })
+        return NextResponse.json({ success: true, message: `Claude connected successfully ${diag}`, provider: "claude" })
       } catch (fetchErr) {
         return NextResponse.json({
           success: false,
@@ -71,11 +69,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // OpenAI-compatible providers (OpenAI, DeepSeek, Groq)
-    const config: Record<string, { url: string; model: string; prefix?: string }> = {
-      openai: { url: "https://api.openai.com/v1/chat/completions", model: "gpt-4o-mini", prefix: "sk-" },
-      deepseek: { url: "https://api.deepseek.com/v1/chat/completions", model: "deepseek-chat" },
-      groq: { url: "https://api.groq.com/openai/v1/chat/completions", model: "llama-3.1-8b-instant", prefix: "gsk_" },
+    // ─── OpenAI-compatible providers (OpenAI, DeepSeek, Groq) ───
+    const config: Record<string, { baseUrl: string; model: string; prefix?: string }> = {
+      openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini", prefix: "sk-" },
+      deepseek: { baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
+      groq: { baseUrl: "https://api.groq.com/openai/v1", model: "llama-3.1-8b-instant", prefix: "gsk_" },
     }
 
     const providerConfig = config[providerId]
@@ -90,8 +88,39 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    // Step 1: Try the models endpoint (GET) — simplest auth check
     try {
-      const res = await fetch(providerConfig.url, {
+      const modelsRes = await fetch(`${providerConfig.baseUrl}/models`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+        },
+      })
+
+      if (modelsRes.ok) {
+        return NextResponse.json({
+          success: true,
+          message: `${providerId} connected successfully ${diag}`,
+          provider: providerId,
+        })
+      }
+
+      // Models endpoint failed — try chat completions as fallback
+      const modelsErr = await modelsRes.text()
+      let modelsParsed: any = null
+      try { modelsParsed = JSON.parse(modelsErr) } catch {}
+
+      // If auth error (401/403), don't bother with chat completions
+      if (modelsRes.status === 401 || modelsRes.status === 403) {
+        const msg = modelsParsed?.error?.message || modelsErr
+        return NextResponse.json({
+          success: false,
+          error: `${providerId} rejected the API key (${modelsRes.status}): ${msg} ${diag}`
+        }, { status: modelsRes.status })
+      }
+
+      // Non-auth error — try chat completions
+      const chatRes = await fetch(`${providerConfig.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -99,27 +128,28 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           model: providerConfig.model,
-          messages: [{ role: "user", content: "Hi" }],
-          max_tokens: 10,
+          messages: [{ role: "user", content: "test" }],
+          max_tokens: 5,
         }),
       })
 
-      if (!res.ok) {
-        const errText = await res.text()
-        let parsed: any = null
-        try { parsed = JSON.parse(errText) } catch {}
-        const msg = parsed?.error?.message || errText
+      if (chatRes.ok) {
         return NextResponse.json({
-          success: false,
-          error: `${providerId} returned ${res.status}: ${msg} ${diag}`
-        }, { status: res.status })
+          success: true,
+          message: `${providerId} connected successfully ${diag}`,
+          provider: providerId,
+        })
       }
 
+      const chatErr = await chatRes.text()
+      let chatParsed: any = null
+      try { chatParsed = JSON.parse(chatErr) } catch {}
+      const chatMsg = chatParsed?.error?.message || chatErr
+
       return NextResponse.json({
-        success: true,
-        message: `${providerId} connection successful ${diag}`,
-        provider: providerId
-      })
+        success: false,
+        error: `${providerId} returned ${chatRes.status}: ${chatMsg} ${diag}`
+      }, { status: chatRes.status })
     } catch (fetchErr) {
       return NextResponse.json({
         success: false,

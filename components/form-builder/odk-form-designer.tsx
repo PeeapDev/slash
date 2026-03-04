@@ -359,8 +359,11 @@ export default function OdkFormDesigner({ form, onClose, projectId }: OdkFormDes
     }
   }, [formName, fields, saveForm, onClose])
 
+  const [publishError, setPublishError] = useState<string | null>(null)
+
   const handlePublish = useCallback(() => {
     if (!formName.trim() || fields.length === 0) return
+    setPublishError(null)
     const id = saveForm()
     if (!id) return
     const published = publishForm(id)
@@ -374,9 +377,15 @@ export default function OdkFormDesigner({ form, onClose, projectId }: OdkFormDes
       })
         .then(res => res.json())
         .then(data => {
-          if (!data.success) console.warn('Server publish failed:', data.error)
+          if (!data.success) {
+            console.warn('Server publish failed:', data.error)
+            setPublishError(`Form saved locally but server publish failed: ${data.error || 'Unknown error'}. Shared links may not work.`)
+          }
         })
-        .catch(err => console.warn('Server publish error:', err))
+        .catch(err => {
+          console.warn('Server publish error:', err)
+          setPublishError('Form saved locally but could not reach server. Shared links may not work until server is available.')
+        })
     }
   }, [formName, fields, saveForm])
 
@@ -468,6 +477,12 @@ export default function OdkFormDesigner({ form, onClose, projectId }: OdkFormDes
         canPublish={canSave}
         publishStatus={publishStatus}
       />
+
+      {publishError && (
+        <div className="mx-4 mt-1 p-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded">
+          {publishError}
+        </div>
+      )}
 
       <ResizablePanelGroup direction="horizontal" className="flex-1 border-t">
         {/* Structure Tree */}
