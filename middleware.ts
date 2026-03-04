@@ -62,16 +62,15 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // API routes handle their own auth — let them through
+  // (middleware can't read localStorage sessions, only cookies)
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) {
-    // API routes → 401 JSON
-    if (pathname.startsWith('/api/')) {
-      return NextResponse.json(
-        { success: false, error: 'Authentication required' },
-        { status: 401 }
-      )
-    }
     // Page routes → redirect to login
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)

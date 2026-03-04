@@ -64,12 +64,17 @@ function InlineLogin() {
     setLoading(true)
 
     try {
-      const result = await login(email, password)
+      // Timeout after 10 seconds so it never hangs forever
+      const loginPromise = login(email, password)
+      const timeoutPromise = new Promise<{ success: false; error: string }>((resolve) =>
+        setTimeout(() => resolve({ success: false, error: "Login timed out. Please try again." }), 10000)
+      )
+      const result = await Promise.race([loginPromise, timeoutPromise])
       if (!result.success) {
         setError(result.error || "Login failed")
       }
-    } catch {
-      setError("An unexpected error occurred")
+    } catch (err: any) {
+      setError(err?.message || "An unexpected error occurred")
     } finally {
       setLoading(false)
     }
