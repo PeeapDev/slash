@@ -372,105 +372,12 @@ class OdkStore {
     return [header, ...rows].join("\n")
   }
 
-  // ─── Seed Data ───
+  // ─── Seed Data (no fake submissions — only real data shows in dashboard) ───
 
   async seed(): Promise<void> {
-    const projects = await this.getProjects()
-    if (projects.length > 0) return // Already seeded
-
-    const { getForms, saveForms } = await import("./form-store")
-
-    // Create 2 sample projects
-    const p1: OdkProject = {
-      id: "proj-odk-001",
-      name: "Community Health Assessment 2025",
-      description: "Annual health survey across 12 districts focusing on water, sanitation, and nutrition indicators.",
-      archived: false,
-      createdAt: "2025-01-15T08:00:00Z",
-      updatedAt: "2025-03-01T10:00:00Z",
-    }
-    const p2: OdkProject = {
-      id: "proj-odk-002",
-      name: "School Nutrition Pilot",
-      description: "Pilot study measuring nutritional status of children aged 5-12 in selected schools.",
-      archived: false,
-      createdAt: "2025-02-01T09:00:00Z",
-      updatedAt: "2025-02-20T14:30:00Z",
-    }
-    await this._put(STORES.projects, p1)
-    await this._put(STORES.projects, p2)
-
-    // Patch existing sample forms with projectId
-    const forms = getForms()
-    const patched = forms.map((f, i) => ({
-      ...f,
-      projectId: i === 0 ? p1.id : p1.id,
-      odkStatus: "open" as const,
-    }))
-    saveForms(patched)
-
-    // Create demo submissions for FORM-001
-    const submitters = ["Alice Mugo", "Brian Wanjiku", "Cynthia Odhiambo", "David Kimani", "Esther Nyambura"]
-    const reviewStates: OdkReviewState[] = ["received", "approved", "hasIssues", "approved", "received"]
-
-    for (let i = 0; i < 5; i++) {
-      const sub: OdkSubmission = {
-        id: uuidv4(),
-        formId: "FORM-001",
-        projectId: p1.id,
-        data: {
-          "field-001": `Household ${i + 1}`,
-          "field-002": Math.floor(Math.random() * 6) + 1,
-          "field-002b": Math.floor(Math.random() * 4),
-          "field-003": ["North", "South", "East", "West"][i % 4],
-          "field-004": ["Tap water", "Well water", "Borehole"][i % 3],
-          "field-005x": ["Grid electricity", "Solar power", "No electricity"][i % 3],
-        },
-        submitter: submitters[i],
-        reviewState: reviewStates[i],
-        createdAt: new Date(Date.now() - (5 - i) * 86400000).toISOString(),
-        updatedAt: new Date(Date.now() - (5 - i) * 86400000).toISOString(),
-      }
-      await this._put(STORES.submissions, sub)
-    }
-
-    // Create demo submissions for FORM-002
-    for (let i = 0; i < 3; i++) {
-      const sub: OdkSubmission = {
-        id: uuidv4(),
-        formId: "FORM-002",
-        projectId: p1.id,
-        data: {
-          "field-s01": `UR-${String(i + 1).padStart(4, "0")}`,
-          "field-s02": new Date(Date.now() - i * 86400000).toISOString().split("T")[0],
-          "field-s03": "09:30",
-          "field-s04": (Math.random() * 50 + 10).toFixed(1),
-          "field-s05": ["Excellent", "Good", "Acceptable"][i % 3],
-        },
-        submitter: submitters[i],
-        reviewState: "received",
-        createdAt: new Date(Date.now() - i * 86400000).toISOString(),
-        updatedAt: new Date(Date.now() - i * 86400000).toISOString(),
-      }
-      await this._put(STORES.submissions, sub)
-    }
-
-    // Web users
-    const admin: OdkWebUser = {
-      id: uuidv4(),
-      email: "admin@slash.org",
-      displayName: "Admin User",
-      siteRole: "admin",
-      createdAt: "2025-01-01T00:00:00Z",
-      updatedAt: "2025-01-01T00:00:00Z",
-    }
-    await this._put(STORES.webUsers, admin)
-
-    // App users for p1
-    await this.createAppUser(p1.id, "Field Tablet 1")
-    await this.createAppUser(p1.id, "Field Tablet 2")
-
-    console.log("✅ ODK seed data created")
+    // No-op: we no longer seed fake data.
+    // Projects are created by users via the UI.
+    // Submissions come from real form fills.
   }
 }
 

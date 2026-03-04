@@ -13,7 +13,7 @@ export async function GET() {
     const sb = getSupabaseClient()
     const { data, error } = await sb
       .from('system_logs')
-      .select('*, users_profile!user_id(full_name, email)')
+      .select('id, user_id, action, entity_type, entity_id, details, ip_address, user_agent, created_at, users_profile!user_id(full_name, email)')
       .order('created_at', { ascending: false })
       .limit(200)
 

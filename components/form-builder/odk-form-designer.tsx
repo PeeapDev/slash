@@ -371,7 +371,12 @@ export default function OdkFormDesigner({ form, onClose, projectId }: OdkFormDes
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ form: published }),
-      }).catch(() => {}) // fire-and-forget
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (!data.success) console.warn('Server publish failed:', data.error)
+        })
+        .catch(err => console.warn('Server publish error:', err))
     }
   }, [formName, fields, saveForm])
 

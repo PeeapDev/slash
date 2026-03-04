@@ -43,14 +43,7 @@ export class AuthService {
         .eq('id', authData.user.id)
         .single()
 
-      // Fire-and-forget — don't block registration on logging
-      LogService.logAction({
-        userId: authData.user.id,
-        action: 'USER_REGISTERED',
-        entityType: 'user',
-        entityId: authData.user.id,
-        details: { email, role, region: regionId, district: districtId },
-      }).catch(() => {})
+      // Logging is now done in the API route handler with IP/device info
 
       return {
         success: true,
@@ -94,14 +87,7 @@ export class AuthService {
       if (profileError) throw new Error('User profile not found')
       if (!profile.is_active) throw new Error('User account is inactive')
 
-      // Fire-and-forget — don't block login on logging
-      LogService.logAction({
-        userId: profile.id,
-        action: 'USER_LOGIN',
-        entityType: 'user',
-        entityId: profile.id,
-        details: { email, loginTime: new Date().toISOString() },
-      }).catch(() => {})
+      // Logging is now done in the API route handler with IP/device info
 
       return {
         success: true,

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { RefreshCw, AlertCircle, ScrollText } from "lucide-react"
+import { RefreshCw, AlertCircle, ScrollText, Monitor, Smartphone, Globe } from "lucide-react"
 import { format } from "date-fns"
 
 interface SystemLog {
@@ -14,6 +14,8 @@ interface SystemLog {
   entity_type: string
   entity_id: string
   details: any
+  ip_address?: string
+  user_agent?: string
   created_at: string
   user_name?: string
   user_email?: string
@@ -42,7 +44,6 @@ export default function SystemLogs() {
       }
       setServerAvailable(true)
 
-      // Fetch logs from API
       const logsRes = await fetch('/api/logs')
       if (logsRes.ok) {
         const logsData = await logsRes.json()
@@ -72,12 +73,41 @@ export default function SystemLogs() {
     : logs.filter(l => l.action === filterAction)
 
   const getActionColor = (action: string) => {
-    if (action.includes('LOGIN')) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+    if (action.includes('LOGIN') && !action.includes('FAIL')) return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
     if (action.includes('LOGOUT')) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-    if (action.includes('REGISTER')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+    if (action.includes('REGISTER') && !action.includes('FAIL')) return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
     if (action.includes('UPDATE')) return 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
     if (action.includes('ERROR') || action.includes('FAIL')) return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
     return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+  }
+
+  const getDeviceIcon = (ua?: string) => {
+    if (!ua) return <Globe className="h-3.5 w-3.5" />
+    if (/mobile|android|iphone/i.test(ua)) return <Smartphone className="h-3.5 w-3.5" />
+    return <Monitor className="h-3.5 w-3.5" />
+  }
+
+  const getDeviceLabel = (details: any, ua?: string): string => {
+    if (details?.device) return details.device
+    if (!ua) return '-'
+    if (/mobile|android|iphone/i.test(ua)) return 'Mobile'
+    if (/windows/i.test(ua)) return 'Windows'
+    if (/macintosh|mac os/i.test(ua)) return 'Mac'
+    if (/linux/i.test(ua)) return 'Linux'
+    return 'Browser'
+  }
+
+  const getDetailsSummary = (log: SystemLog): string => {
+    if (!log.details) return '-'
+    const d = typeof log.details === 'string' ? (() => { try { return JSON.parse(log.details) } catch { return null } })() : log.details
+    if (!d) return typeof log.details === 'string' ? log.details : '-'
+
+    // Show the most useful info from details
+    if (d.reason) return d.reason
+    if (d.error) return d.error
+    if (d.email && d.role) return `${d.email} (${d.role})`
+    if (d.email) return d.email
+    return JSON.stringify(d)
   }
 
   if (!serverAvailable && !loading) {
@@ -103,7 +133,7 @@ export default function SystemLogs() {
         <div>
           <div className="text-sm text-muted-foreground">Admin / System Logs</div>
           <h1 className="text-2xl font-bold mt-1">System Logs & Audit Trail</h1>
-          <p className="text-sm text-muted-foreground mt-1">Real-time system activities and user actions</p>
+          <p className="text-sm text-muted-foreground mt-1">Login attempts, errors, IP addresses, and device information</p>
         </div>
         <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="gap-2">
           <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
@@ -125,7 +155,7 @@ export default function SystemLogs() {
             <Badge
               key={action}
               variant={filterAction === action ? "default" : "outline"}
-              className="cursor-pointer"
+              className={`cursor-pointer ${action.includes('FAIL') || action.includes('ERROR') ? 'border-red-300' : ''}`}
               onClick={() => setFilterAction(action)}
             >
               {action.replace(/_/g, ' ')} ({logs.filter(l => l.action === action).length})
@@ -143,48 +173,59 @@ export default function SystemLogs() {
         <Card className="p-12 text-center">
           <ScrollText className="h-10 w-10 text-muted-foreground/50 mx-auto mb-3" />
           <p className="text-sm text-muted-foreground">
-            {logs.length === 0 ? 'No system logs yet. Logs are recorded when users log in, register, and perform actions.' : 'No logs match the selected filter.'}
+            {logs.length === 0 ? 'No system logs yet. Logs are recorded on login, registration, errors, and other actions.' : 'No logs match the selected filter.'}
           </p>
         </Card>
       ) : (
         <Card className="overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted">
-              <tr>
-                <th className="text-left py-3 px-4 font-semibold">Time</th>
-                <th className="text-left py-3 px-4 font-semibold">User</th>
-                <th className="text-left py-3 px-4 font-semibold">Action</th>
-                <th className="text-left py-3 px-4 font-semibold hidden md:table-cell">Entity</th>
-                <th className="text-left py-3 px-4 font-semibold hidden lg:table-cell">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLogs.map((log) => (
-                <tr key={log.id} className="border-b border-border hover:bg-muted/50">
-                  <td className="py-3 px-4 text-muted-foreground text-xs whitespace-nowrap">
-                    {log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm:ss') : '-'}
-                  </td>
-                  <td className="py-3 px-4">
-                    <div>
-                      <div className="font-medium text-sm">{log.user_name || '-'}</div>
-                      <div className="text-xs text-muted-foreground">{log.user_email || ''}</div>
-                    </div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${getActionColor(log.action)}`}>
-                      {log.action.replace(/_/g, ' ')}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 hidden md:table-cell text-muted-foreground text-sm">
-                    {log.entity_type || '-'}
-                  </td>
-                  <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground text-xs max-w-[300px] truncate">
-                    {log.details ? (typeof log.details === 'string' ? log.details : JSON.stringify(log.details)) : '-'}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted">
+                <tr>
+                  <th className="text-left py-3 px-4 font-semibold">Time</th>
+                  <th className="text-left py-3 px-4 font-semibold">User</th>
+                  <th className="text-left py-3 px-4 font-semibold">Action</th>
+                  <th className="text-left py-3 px-4 font-semibold hidden md:table-cell">IP Address</th>
+                  <th className="text-left py-3 px-4 font-semibold hidden md:table-cell">Device</th>
+                  <th className="text-left py-3 px-4 font-semibold hidden lg:table-cell">Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredLogs.map((log) => (
+                  <tr key={log.id} className={`border-b border-border hover:bg-muted/50 ${
+                    (log.action.includes('FAIL') || log.action.includes('ERROR')) ? 'bg-red-50/50 dark:bg-red-950/10' : ''
+                  }`}>
+                    <td className="py-3 px-4 text-muted-foreground text-xs whitespace-nowrap">
+                      {log.created_at ? format(new Date(log.created_at), 'MMM d, HH:mm:ss') : '-'}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div>
+                        <div className="font-medium text-sm">{log.user_name || log.details?.email || '-'}</div>
+                        <div className="text-xs text-muted-foreground">{log.user_email || ''}</div>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4">
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${getActionColor(log.action)}`}>
+                        {log.action.replace(/_/g, ' ')}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 hidden md:table-cell text-muted-foreground text-xs font-mono">
+                      {log.ip_address || '-'}
+                    </td>
+                    <td className="py-3 px-4 hidden md:table-cell">
+                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                        {getDeviceIcon(log.user_agent)}
+                        <span>{getDeviceLabel(log.details, log.user_agent)}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 hidden lg:table-cell text-muted-foreground text-xs max-w-[300px] truncate">
+                      {getDetailsSummary(log)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </Card>
       )}
     </div>

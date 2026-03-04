@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   try {
     const sb = getSupabaseClient()
     const { data, error } = await sb
-      .from('published_forms')
+      .from('forms')
       .select('*')
       .eq('form_id', formId)
       .single()
@@ -24,7 +24,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Form not found' }, { status: 404 })
     }
 
-    return NextResponse.json({ success: true, form: data.form_data })
+    // form_schema contains the full form object
+    return NextResponse.json({ success: true, form: data.form_schema })
   } catch {
     return NextResponse.json({ success: false, error: 'Failed to fetch form' }, { status: 500 })
   }
@@ -46,22 +47,28 @@ export async function POST(request: NextRequest) {
 
     const sb = getSupabaseClient()
     const { error } = await sb
-      .from('published_forms')
+      .from('forms')
       .upsert({
         form_id: form.id,
-        form_data: form,
-        name: form.name,
+        title: form.name || form.id,
+        description: form.description || '',
+        form_schema: form,
+        version: form.versions?.length || 1,
+        is_active: form.status !== 'archived',
         updated_at: new Date().toISOString(),
       }, { onConflict: 'form_id' })
 
     if (error) {
-      // Table might not exist — that's OK, forms will work locally
-      console.warn('Could not publish form to server:', error.message)
-      return NextResponse.json({ success: false, error: 'Could not publish to server. Form works locally.' }, { status: 500 })
+      console.error('Form publish error:', error.message)
+      return NextResponse.json({
+        success: false,
+        error: `Could not publish: ${error.message}`
+      }, { status: 500 })
     }
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    console.error('Form publish failed:', error)
     return NextResponse.json({ success: false, error: 'Publish failed' }, { status: 500 })
   }
 }
