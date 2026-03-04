@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   Table,
   TableBody,
@@ -20,6 +20,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import {
   Collapsible,
   CollapsibleContent,
@@ -42,14 +50,144 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Upload,
+  Sparkles,
+  LayoutTemplate,
+  ClipboardList,
+  Stethoscope,
+  Home,
+  Users,
+  Activity,
+  Baby,
+  Loader2,
 } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
-import { Form, getForms, deleteForm, cloneForm, getFormResponses } from "@/lib/form-store"
+import { Form, getForms, deleteForm, cloneForm, getFormResponses, createForm } from "@/lib/form-store"
 import FormBuilderEditor from "./form-builder-editor"
 import FormPreview from "./form-preview"
+import XLSFormImportDialog from "./xlsform-import-dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { getDefaultProvider } from "@/lib/ai-store"
 
 type SortColumn = 'name' | 'type' | 'status' | 'questions' | 'submissions' | 'modified'
 type SortDirection = 'asc' | 'desc'
+
+// ─── Form Templates ───
+
+interface FormTemplate {
+  id: string
+  name: string
+  description: string
+  icon: React.ElementType
+  type: 'survey' | 'sample'
+  category: string
+  fields: any[]
+}
+
+const FORM_TEMPLATES: FormTemplate[] = [
+  {
+    id: 'tpl-household',
+    name: 'Household Survey',
+    description: 'Demographics, family composition, and living conditions with skip logic',
+    icon: Home,
+    type: 'survey',
+    category: 'Health Survey',
+    fields: [
+      { id: 'hh_id', name: 'hh_id', label: 'Household ID', type: 'text', required: true },
+      { id: 'head_name', name: 'head_name', label: 'Head of Household Name', type: 'text', required: true },
+      { id: 'head_gender', name: 'head_gender', label: 'Gender', type: 'select', required: true, options: ['Male', 'Female'] },
+      { id: 'num_members', name: 'num_members', label: 'Number of Household Members', type: 'number', required: true, validation: { min: 1, max: 50 } },
+      { id: 'has_children', name: 'has_children', label: 'Are there children under 5?', type: 'select', required: true, options: ['Yes', 'No'] },
+      { id: 'num_children', name: 'num_children', label: 'Number of children under 5', type: 'number', skipLogic: { field: 'has_children', operator: 'equals', value: 'Yes' }, validation: { min: 1, max: 20 } },
+      { id: 'water_source', name: 'water_source', label: 'Primary Water Source', type: 'select', required: true, options: ['Piped water', 'Borehole', 'Well', 'River/Stream', 'Rainwater', 'Other'] },
+      { id: 'water_other', name: 'water_other', label: 'Specify other water source', type: 'text', skipLogic: { field: 'water_source', operator: 'equals', value: 'Other' } },
+      { id: 'gps', name: 'gps', label: 'GPS Location', type: 'geopoint' },
+      { id: 'photo', name: 'photo', label: 'Household Photo', type: 'image' },
+    ],
+  },
+  {
+    id: 'tpl-health-screening',
+    name: 'Health Screening',
+    description: 'Patient vitals, symptoms assessment with cascading conditions',
+    icon: Stethoscope,
+    type: 'survey',
+    category: 'Clinical',
+    fields: [
+      { id: 'patient_id', name: 'patient_id', label: 'Patient ID', type: 'text', required: true },
+      { id: 'visit_date', name: 'visit_date', label: 'Visit Date', type: 'date', required: true },
+      { id: 'age', name: 'age', label: 'Age (years)', type: 'number', required: true, validation: { min: 0, max: 150 } },
+      { id: 'sex', name: 'sex', label: 'Sex', type: 'select', required: true, options: ['Male', 'Female'] },
+      { id: 'pregnant', name: 'pregnant', label: 'Currently pregnant?', type: 'select', options: ['Yes', 'No'], skipLogic: { field: 'sex', operator: 'equals', value: 'Female' } },
+      { id: 'trimester', name: 'trimester', label: 'Trimester', type: 'select', options: ['1st', '2nd', '3rd'], skipLogic: { field: 'pregnant', operator: 'equals', value: 'Yes' } },
+      { id: 'temp', name: 'temp', label: 'Temperature (°C)', type: 'decimal', required: true, validation: { min: 34, max: 43 } },
+      { id: 'bp_systolic', name: 'bp_systolic', label: 'Blood Pressure (Systolic)', type: 'number', validation: { min: 60, max: 250 } },
+      { id: 'bp_diastolic', name: 'bp_diastolic', label: 'Blood Pressure (Diastolic)', type: 'number', validation: { min: 30, max: 150 } },
+      { id: 'weight', name: 'weight', label: 'Weight (kg)', type: 'decimal', validation: { min: 0.5, max: 300 } },
+      { id: 'symptoms', name: 'symptoms', label: 'Symptoms (select all)', type: 'multiselect', options: ['Fever', 'Cough', 'Headache', 'Fatigue', 'Diarrhea', 'Vomiting', 'Rash', 'None'] },
+      { id: 'referral', name: 'referral', label: 'Referred to facility?', type: 'select', options: ['Yes', 'No'] },
+    ],
+  },
+  {
+    id: 'tpl-sample-collection',
+    name: 'Lab Sample Collection',
+    description: 'Sample tracking with barcode, chain of custody, and lab results',
+    icon: Beaker,
+    type: 'sample',
+    category: 'Laboratory',
+    fields: [
+      { id: 'sample_id', name: 'sample_id', label: 'Sample Barcode', type: 'barcode', required: true },
+      { id: 'sample_type', name: 'sample_type', label: 'Sample Type', type: 'select', required: true, options: ['Blood', 'Urine', 'Stool', 'Sputum', 'Swab', 'Water', 'Soil'] },
+      { id: 'collection_date', name: 'collection_date', label: 'Collection Date/Time', type: 'datetime', required: true },
+      { id: 'collector_name', name: 'collector_name', label: 'Collected By', type: 'text', required: true },
+      { id: 'participant_id', name: 'participant_id', label: 'Participant ID', type: 'text', required: true },
+      { id: 'storage_temp', name: 'storage_temp', label: 'Storage Temperature', type: 'select', required: true, options: ['Room temp', '2-8°C', '-20°C', '-80°C'] },
+      { id: 'condition', name: 'condition', label: 'Sample Condition', type: 'select', required: true, options: ['Good', 'Hemolyzed', 'Lipemic', 'Clotted', 'Insufficient'] },
+      { id: 'rejected', name: 'rejected', label: 'Sample rejected?', type: 'select', options: ['Yes', 'No'], skipLogic: { field: 'condition', operator: 'not_equals', value: 'Good' } },
+      { id: 'reject_reason', name: 'reject_reason', label: 'Rejection reason', type: 'text', skipLogic: { field: 'rejected', operator: 'equals', value: 'Yes' } },
+      { id: 'notes', name: 'notes', label: 'Notes', type: 'text' },
+    ],
+  },
+  {
+    id: 'tpl-maternal',
+    name: 'Maternal & Child Health',
+    description: 'Antenatal care, immunization tracking, and growth monitoring',
+    icon: Baby,
+    type: 'survey',
+    category: 'Health Survey',
+    fields: [
+      { id: 'mother_id', name: 'mother_id', label: 'Mother ID', type: 'text', required: true },
+      { id: 'visit_type', name: 'visit_type', label: 'Visit Type', type: 'select', required: true, options: ['Antenatal', 'Postnatal', 'Child Growth Monitoring', 'Immunization'] },
+      { id: 'gest_weeks', name: 'gest_weeks', label: 'Gestational Age (weeks)', type: 'number', validation: { min: 1, max: 45 }, skipLogic: { field: 'visit_type', operator: 'equals', value: 'Antenatal' } },
+      { id: 'child_name', name: 'child_name', label: 'Child Name', type: 'text', skipLogic: { field: 'visit_type', operator: 'not_equals', value: 'Antenatal' } },
+      { id: 'child_dob', name: 'child_dob', label: 'Child Date of Birth', type: 'date', skipLogic: { field: 'visit_type', operator: 'not_equals', value: 'Antenatal' } },
+      { id: 'child_weight', name: 'child_weight', label: 'Child Weight (kg)', type: 'decimal', validation: { min: 0.5, max: 30 }, skipLogic: { field: 'visit_type', operator: 'equals', value: 'Child Growth Monitoring' } },
+      { id: 'child_height', name: 'child_height', label: 'Child Height (cm)', type: 'decimal', validation: { min: 30, max: 150 }, skipLogic: { field: 'visit_type', operator: 'equals', value: 'Child Growth Monitoring' } },
+      { id: 'muac', name: 'muac', label: 'MUAC (cm)', type: 'decimal', validation: { min: 5, max: 30 }, skipLogic: { field: 'visit_type', operator: 'equals', value: 'Child Growth Monitoring' } },
+      { id: 'vaccines', name: 'vaccines', label: 'Vaccines Given', type: 'multiselect', options: ['BCG', 'OPV', 'Penta', 'PCV', 'Rota', 'Measles', 'Yellow Fever', 'Vitamin A'], skipLogic: { field: 'visit_type', operator: 'equals', value: 'Immunization' } },
+      { id: 'next_visit', name: 'next_visit', label: 'Next Visit Date', type: 'date' },
+    ],
+  },
+  {
+    id: 'tpl-community',
+    name: 'Community Health Assessment',
+    description: 'Village-level health infrastructure and disease surveillance',
+    icon: Users,
+    type: 'survey',
+    category: 'Health Survey',
+    fields: [
+      { id: 'community_name', name: 'community_name', label: 'Community/Village Name', type: 'text', required: true },
+      { id: 'population', name: 'population', label: 'Estimated Population', type: 'number', required: true },
+      { id: 'has_health_facility', name: 'has_health_facility', label: 'Health facility present?', type: 'select', required: true, options: ['Yes', 'No'] },
+      { id: 'facility_type', name: 'facility_type', label: 'Facility Type', type: 'select', options: ['Hospital', 'Health Center', 'Dispensary', 'CHPS Compound'], skipLogic: { field: 'has_health_facility', operator: 'equals', value: 'Yes' } },
+      { id: 'dist_to_facility', name: 'dist_to_facility', label: 'Distance to nearest facility (km)', type: 'decimal', skipLogic: { field: 'has_health_facility', operator: 'equals', value: 'No' } },
+      { id: 'common_diseases', name: 'common_diseases', label: 'Most common diseases', type: 'multiselect', options: ['Malaria', 'Diarrhea', 'Pneumonia', 'Typhoid', 'Cholera', 'TB', 'HIV/AIDS', 'Malnutrition'] },
+      { id: 'water_access', name: 'water_access', label: 'Access to clean water (%)', type: 'number', validation: { min: 0, max: 100 } },
+      { id: 'sanitation', name: 'sanitation', label: 'Sanitation coverage (%)', type: 'number', validation: { min: 0, max: 100 } },
+      { id: 'gps', name: 'gps', label: 'GPS Coordinates', type: 'geopoint' },
+      { id: 'assessor_notes', name: 'assessor_notes', label: 'Assessor Notes', type: 'text' },
+    ],
+  },
+]
 
 export default function FormBuilder() {
   const [forms, setForms] = useState<Form[]>([])
@@ -62,6 +200,12 @@ export default function FormBuilder() {
   const [sortColumn, setSortColumn] = useState<SortColumn>('modified')
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [archivedOpen, setArchivedOpen] = useState(false)
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false)
+  const [aiDialogOpen, setAiDialogOpen] = useState(false)
+  const [aiPrompt, setAiPrompt] = useState("")
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState("")
 
   useEffect(() => {
     loadForms()
@@ -156,6 +300,101 @@ export default function FormBuilder() {
   const handleCreateNew = () => {
     setEditingForm(null)
     setCurrentView('editor')
+  }
+
+  const handleImported = (form: Form) => {
+    loadForms()
+    setEditingForm(form)
+    setCurrentView('editor')
+  }
+
+  const handleUseTemplate = (template: FormTemplate) => {
+    const form = createForm({
+      name: template.name,
+      type: template.type,
+      targetRole: 'field-collector',
+      assignedProjects: [],
+      assignedRegions: [],
+      fields: template.fields,
+      createdBy: 'current-user',
+      status: 'active',
+      publishStatus: 'draft',
+    })
+    setTemplateDialogOpen(false)
+    setEditingForm(form)
+    setCurrentView('editor')
+  }
+
+  const handleAIBuild = async () => {
+    if (!aiPrompt.trim()) return
+    setAiGenerating(true)
+    setAiError("")
+
+    const provider = getDefaultProvider()
+    if (!provider) {
+      setAiError("No AI provider configured. Go to Settings > AI Integration to add an API key.")
+      setAiGenerating(false)
+      return
+    }
+
+    try {
+      const res = await fetch('/api/ai/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId: provider.id,
+          apiKey: provider.apiKey,
+          messages: [
+            {
+              role: 'system',
+              content: `You are a form designer for health data collection. Generate a JSON array of form fields based on the user's description. Each field must have: id (snake_case), name (same as id), label (human readable), type (one of: text, number, decimal, select, multiselect, date, datetime, time, image, barcode, geopoint), required (boolean). For select/multiselect fields include an "options" array of strings. For number/decimal fields optionally include "validation" with min/max. For conditional fields include "skipLogic" with field, operator (equals/not_equals), value. Return ONLY the JSON array, no explanation.`
+            },
+            { role: 'user', content: aiPrompt }
+          ],
+          max_tokens: 2000,
+          temperature: 0.2,
+        }),
+      })
+
+      const data = await res.json()
+      if (!data.success) {
+        setAiError(data.error || 'AI generation failed')
+        setAiGenerating(false)
+        return
+      }
+
+      let fields: any[]
+      try {
+        const text = data.data.trim()
+        const jsonMatch = text.match(/\[[\s\S]*\]/)
+        fields = JSON.parse(jsonMatch ? jsonMatch[0] : text)
+      } catch {
+        setAiError('AI returned invalid form data. Try a more specific description.')
+        setAiGenerating(false)
+        return
+      }
+
+      const form = createForm({
+        name: aiPrompt.slice(0, 60),
+        type: 'survey',
+        targetRole: 'field-collector',
+        assignedProjects: [],
+        assignedRegions: [],
+        fields,
+        createdBy: 'current-user',
+        status: 'active',
+        publishStatus: 'draft',
+      })
+
+      setAiDialogOpen(false)
+      setAiPrompt("")
+      setEditingForm(form)
+      setCurrentView('editor')
+    } catch (err: any) {
+      setAiError(err?.message || 'Failed to connect to AI')
+    } finally {
+      setAiGenerating(false)
+    }
   }
 
   const handleEdit = (form: Form) => {
@@ -428,14 +667,61 @@ export default function FormBuilder() {
   )
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 p-4 md:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Form Builder</h1>
-        <Button onClick={handleCreateNew} size="sm" className="gap-1.5">
-          <Plus className="w-4 h-4" />
-          New Form
-        </Button>
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Form Builder</h1>
+          <Button onClick={handleCreateNew} size="sm" className="gap-1.5">
+            <Plus className="w-4 h-4" />
+            Blank Form
+          </Button>
+        </div>
+
+        {/* Action cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Upload Form */}
+          <button
+            onClick={() => setImportDialogOpen(true)}
+            className="group relative flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 p-5 text-center transition-all hover:border-primary hover:bg-primary/10 hover:shadow-md"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+              <Upload className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Upload Form</p>
+              <p className="text-xs text-muted-foreground">Import XLSForm (.xlsx)</p>
+            </div>
+          </button>
+
+          {/* Build with AI */}
+          <button
+            onClick={() => { setAiError(""); setAiDialogOpen(true) }}
+            className="group relative flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-violet-400/30 bg-violet-50 dark:bg-violet-950/20 p-5 text-center transition-all hover:border-violet-500 hover:bg-violet-100 dark:hover:bg-violet-950/40 hover:shadow-md"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/50 text-violet-600 dark:text-violet-400 group-hover:bg-violet-600 group-hover:text-white transition-colors">
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Build with AI</p>
+              <p className="text-xs text-muted-foreground">Describe your form</p>
+            </div>
+          </button>
+
+          {/* Use Template */}
+          <button
+            onClick={() => setTemplateDialogOpen(true)}
+            className="group relative flex flex-col items-center gap-2 rounded-xl border-2 border-dashed border-emerald-400/30 bg-emerald-50 dark:bg-emerald-950/20 p-5 text-center transition-all hover:border-emerald-500 hover:bg-emerald-100 dark:hover:bg-emerald-950/40 hover:shadow-md"
+          >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+              <LayoutTemplate className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-semibold text-sm">Use Template</p>
+              <p className="text-xs text-muted-foreground">Start from a template</p>
+            </div>
+          </button>
+        </div>
       </div>
 
       {/* Stats + Search + Filter bar */}
@@ -539,6 +825,113 @@ export default function FormBuilder() {
           </Card>
         </Collapsible>
       )}
+
+      {/* XLSForm Import Dialog */}
+      <XLSFormImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImported={handleImported}
+      />
+
+      {/* Template Dialog */}
+      <Dialog open={templateDialogOpen} onOpenChange={setTemplateDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <LayoutTemplate className="h-5 w-5 text-emerald-600" />
+              Form Templates
+            </DialogTitle>
+            <DialogDescription>
+              Choose a template with pre-built fields, skip logic, and validation rules
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 py-2">
+            {FORM_TEMPLATES.map((tpl) => {
+              const Icon = tpl.icon
+              return (
+                <button
+                  key={tpl.id}
+                  onClick={() => handleUseTemplate(tpl)}
+                  className="flex items-start gap-4 rounded-lg border p-4 text-left hover:bg-muted/50 hover:border-primary/30 transition-colors"
+                >
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm">{tpl.name}</p>
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        {tpl.fields.length} fields
+                      </Badge>
+                      <Badge variant="outline" className={`text-[10px] shrink-0 ${
+                        tpl.type === 'survey' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-purple-50 text-purple-700 border-purple-200'
+                      }`}>
+                        {tpl.type}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{tpl.description}</p>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0 mt-1" />
+                </button>
+              )
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Form Builder Dialog */}
+      <Dialog open={aiDialogOpen} onOpenChange={setAiDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-violet-600" />
+              Build Form with AI
+            </DialogTitle>
+            <DialogDescription>
+              Describe the form you need and AI will generate the fields, validation, and skip logic
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <Textarea
+              placeholder="Example: Create a malaria rapid diagnostic test form with patient ID, age, sex, pregnancy status (for females only), RDT result, treatment given if positive, and GPS location"
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              rows={5}
+              className="resize-none"
+            />
+            {aiError && (
+              <div className="p-3 text-sm text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400 rounded-lg">
+                {aiError}
+              </div>
+            )}
+            <div className="text-xs text-muted-foreground">
+              Tip: Be specific about field types, conditions, and validation rules you need.
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAiDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAIBuild}
+              disabled={!aiPrompt.trim() || aiGenerating}
+              className="gap-2 bg-violet-600 hover:bg-violet-700"
+            >
+              {aiGenerating ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Generate Form
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

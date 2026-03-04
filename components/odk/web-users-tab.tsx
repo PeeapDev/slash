@@ -49,7 +49,11 @@ interface WebUser {
   createdAt: string
 }
 
-export default function WebUsersTab() {
+interface WebUsersTabProps {
+  filterRoles?: TeamRole[]
+}
+
+export default function WebUsersTab({ filterRoles }: WebUsersTabProps) {
   const [users, setUsers] = useState<WebUser[]>([])
   const [loading, setLoading] = useState(true)
   const [serverAvailable, setServerAvailable] = useState(false)
@@ -60,7 +64,7 @@ export default function WebUsersTab() {
   const [email, setEmail] = useState("")
   const [displayName, setDisplayName] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<TeamRole>("field_collector")
+  const [role, setRole] = useState<TeamRole>(filterRoles?.[0] || "field_collector")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -126,21 +130,24 @@ export default function WebUsersTab() {
     setEditUser(u)
   }
 
-  const roleOptions = Object.entries(ROLE_DEFINITIONS).map(([key, def]) => ({
-    value: key as TeamRole,
-    label: def.title,
-  }))
+  const roleOptions = Object.entries(ROLE_DEFINITIONS)
+    .filter(([key]) => !filterRoles || filterRoles.includes(key as TeamRole))
+    .map(([key, def]) => ({
+      value: key as TeamRole,
+      label: def.title,
+    }))
+
+  const displayUsers = filterRoles
+    ? users.filter(u => filterRoles.includes(u.role))
+    : users
 
   if (!serverAvailable && !loading) {
     return (
-      <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Web Users</h2>
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
-          <p className="text-sm text-muted-foreground">
-            Supabase not configured. User management requires a cloud connection.
-          </p>
-        </div>
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <AlertCircle className="h-10 w-10 text-muted-foreground/50 mb-3" />
+        <p className="text-sm text-muted-foreground">
+          Supabase not configured. User management requires a cloud connection.
+        </p>
       </div>
     )
   }
@@ -148,7 +155,7 @@ export default function WebUsersTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Web Users</h2>
+        <div className="text-sm text-muted-foreground">{displayUsers.length} total</div>
         <Button
           size="sm"
           onClick={() => {
@@ -165,7 +172,7 @@ export default function WebUsersTab() {
         <div className="flex items-center justify-center py-12">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
         </div>
-      ) : users.length === 0 ? (
+      ) : displayUsers.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <Users className="h-10 w-10 text-muted-foreground/50 mb-3" />
           <p className="text-sm text-muted-foreground">No web users yet.</p>
@@ -184,7 +191,7 @@ export default function WebUsersTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => (
+              {displayUsers.map((u) => (
                 <TableRow key={u.id}>
                   <TableCell className="font-medium">{u.fullName}</TableCell>
                   <TableCell className="text-muted-foreground">{u.email}</TableCell>

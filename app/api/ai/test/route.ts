@@ -12,14 +12,14 @@ export async function POST(request: NextRequest) {
 
     if (!providerId) return jsonError(400, "Missing providerId")
 
-    // Check env var first, then body
+    // Prefer user-provided key, fallback to env var
     const envKeys: Record<ProviderId, string | undefined> = {
       openai: process.env.OPENAI_API_KEY,
       claude: process.env.ANTHROPIC_API_KEY,
       deepseek: process.env.DEEPSEEK_API_KEY,
       groq: process.env.GROQ_API_KEY,
     }
-    const apiKey = envKeys[providerId] || bodyKey
+    const apiKey = bodyKey || envKeys[providerId]
     if (!apiKey) return jsonError(400, "Missing API key for provider")
 
     // Test directly — don't route through /api/ai/analyze

@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(body.messages) || body.messages.length === 0) return jsonError(400, "Missing messages")
 
     const providerKey = getEnvKey(body.providerId)
-    const apiKey = providerKey || body.apiKey
+    const apiKey = body.apiKey || providerKey
 
     if (!apiKey) return jsonError(400, "Missing API key for provider")
 

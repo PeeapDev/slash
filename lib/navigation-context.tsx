@@ -13,6 +13,7 @@ export type OdkView =
   | "lab-workflow"
   | "ai-analytics"
   | "users"
+  | "staff"
   | "system-settings"
   | "profile"
 
@@ -51,7 +52,8 @@ const VIEW_LABELS: Partial<Record<OdkView, string>> = {
   submissions: "Submissions",
   "lab-workflow": "Lab Workflow",
   "ai-analytics": "AI Analytics",
-  users: "Users & Teams",
+  users: "Users",
+  staff: "Staff",
   "system-settings": "Settings",
   profile: "Profile",
 }

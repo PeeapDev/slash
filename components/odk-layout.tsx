@@ -14,6 +14,7 @@ import {
   FlaskConical,
   Brain,
   Users2,
+  UserCheck,
   Settings,
   X,
   Menu,
@@ -26,6 +27,7 @@ import ProjectDetailPage from "@/components/odk/project-detail-page"
 import FormDetailPage from "@/components/odk/form-detail-page"
 import SubmissionDetailPage from "@/components/odk/submission-detail-page"
 import UserManagementPage from "@/components/odk/user-management-page"
+import StaffManagementPage from "@/components/odk/staff-management-page"
 import SystemSettingsPage from "@/components/odk/system-settings-page"
 import OdkFormDesigner from "@/components/form-builder/odk-form-designer"
 import FormBuilder from "@/components/form-builder"
@@ -64,7 +66,8 @@ const sidebarItems: SidebarItem[] = [
   { id: "ai-analytics", label: "AI Analytics", icon: Brain, section: "Review & Analysis" },
 
   // Administration
-  { id: "users", label: "Users & Teams", icon: Users2, section: "Administration" },
+  { id: "users", label: "Users", icon: Users2, section: "Administration" },
+  { id: "staff", label: "Staff", icon: UserCheck, section: "Administration" },
   { id: "system-settings", label: "Settings", icon: Settings, section: "Administration" },
 ]
 
@@ -115,6 +118,8 @@ function PageRouter({ user }: { user: { name: string; role: string } }) {
       return <AIAnalyticsPage />
     case "users":
       return <UserManagementPage />
+    case "staff":
+      return <StaffManagementPage />
     case "system-settings":
       return <SystemSettingsPage />
     case "profile":
