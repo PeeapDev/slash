@@ -58,8 +58,15 @@ export default function AICredentials() {
     }))
   }
 
+  // Strip invisible characters that come from copy-paste (zero-width spaces, BOM, etc.)
+  const sanitizeKey = (key: string): string =>
+    key
+      .replace(/[\u200B\u200C\u200D\uFEFF\u00A0]/g, '')
+      .replace(/[^\x20-\x7E]/g, '')
+      .trim()
+
   const saveKey = (providerId: string) => {
-    const newKey = (tempKeys[providerId] || '').trim()
+    const newKey = sanitizeKey(tempKeys[providerId] || '')
     setTempKeys(prev => ({ ...prev, [providerId]: newKey }))
     const updatedProvider = updateAIProvider(providerId, {
       apiKey: newKey,
@@ -73,7 +80,7 @@ export default function AICredentials() {
 
   const handleTest = async (provider: AIProvider) => {
     // Always use the current input value (tempKeys), not stored value
-    const currentKey = (tempKeys[provider.id] || '').trim()
+    const currentKey = sanitizeKey(tempKeys[provider.id] || '')
     if (!currentKey) {
       alert('Please enter an API key first')
       return

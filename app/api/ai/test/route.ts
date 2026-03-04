@@ -11,7 +11,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Missing providerId" }, { status: 400 })
     }
 
-    const apiKey = rawKey?.trim()
+    // Aggressively sanitize API key: strip ALL non-printable/invisible characters
+    // This fixes copy-paste issues with zero-width spaces, BOM, control chars, etc.
+    const apiKey = rawKey
+      ? rawKey
+          .replace(/[\u200B\u200C\u200D\uFEFF\u00A0]/g, '') // zero-width spaces, BOM, NBSP
+          .replace(/[^\x20-\x7E]/g, '') // keep only printable ASCII (space through tilde)
+          .trim()
+      : ''
+
     if (!apiKey) {
       return NextResponse.json({
         success: false,
@@ -19,11 +27,14 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
+    const rawLen = rawKey?.length || 0
+    const cleanLen = apiKey.length
+    const stripped = rawLen - cleanLen
+
     // Diagnostic info
     const keyPrefix = apiKey.substring(0, 8)
     const keyEnd = apiKey.substring(apiKey.length - 4)
-    const keyLength = apiKey.length
-    const diag = `[key: ${keyPrefix}...${keyEnd}, len: ${keyLength}]`
+    const diag = `[key: ${keyPrefix}...${keyEnd}, len: ${cleanLen}${stripped > 0 ? `, stripped ${stripped} invisible chars` : ''}]`
 
     // ─── Claude / Anthropic ───
     if (providerId === "claude") {

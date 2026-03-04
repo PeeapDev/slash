@@ -615,7 +615,7 @@ export function importXLSForm(surveyText: string, choicesText: string): ImportRe
     repeatGroups: repeatGroups.length > 0 ? repeatGroups : undefined,
     createdBy: 'import',
     status: 'active',
-    publishStatus: 'draft',
+    publishStatus: 'published',
     ...(languages.length > 1 ? { languages, defaultLanguage } : {}),
   }
 
