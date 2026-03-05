@@ -9,7 +9,7 @@ let _hydrated = false
 const FAKE_FORM_IDS = new Set(['FORM-001', 'FORM-002'])
 
 // Promise that resolves when IndexedDB hydration is complete
-let _hydrateResolve: () => void
+let _hydrateResolve!: () => void
 const _hydratePromise = new Promise<void>(resolve => { _hydrateResolve = resolve })
 
 /** Wait for IndexedDB hydration to finish (safe to call multiple times). */
@@ -139,6 +139,7 @@ export interface FormGroupMeta {
   description?: string
   collapsed: boolean
   appearance?: 'field-list' | string   // field-list = render all fields on single page
+  parentId?: string                     // parent group ID for nested groups
 }
 
 export interface RepeatGroupMeta {

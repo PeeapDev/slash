@@ -416,12 +416,18 @@ export function importXLSForm(surveyText: string, choicesText: string): ImportRe
     // ── begin_group ──
     if (typeLower === 'begin_group' || typeLower === 'begin group') {
       const groupId = name || `group-${groups.length + 1}`
+      // Determine parent group (nearest group on the stack)
+      let parentId: string | undefined
+      for (let si = groupStack.length - 1; si >= 0; si--) {
+        if (groupStack[si].type === 'group') { parentId = groupStack[si].id; break }
+      }
       groups.push({
         id: groupId,
         label: label || groupId,
         description: hint || undefined,
         collapsed: false,
         appearance: appearance === 'field-list' ? 'field-list' : appearance || undefined,
+        parentId,
       })
       groupStack.push({ type: 'group', id: groupId })
       continue

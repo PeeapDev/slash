@@ -171,37 +171,75 @@ export function formToXForm(form: Form): string {
   const groupMap = new Map(groups.map(g => [g.id, g]))
   const repeatMap = new Map(repeatGroups.map(r => [r.id, r]))
 
+  // Get the ancestor chain for a group (outermost first)
+  const getGroupAncestors = (groupId: string): string[] => {
+    const chain: string[] = []
+    let current = groupMap.get(groupId)
+    while (current?.parentId && groupMap.has(current.parentId)) {
+      chain.unshift(current.parentId)
+      current = groupMap.get(current.parentId)
+    }
+    return chain
+  }
+
   // Build grouped instance children
   const buildInstanceFields = (): string => {
     const lines: string[] = []
-    const processedGroups = new Set<string>()
+    const openGroups: string[] = []
     const processedRepeats = new Set<string>()
 
+    const indent = (depth: number) => '          ' + '  '.repeat(depth)
+
     for (const f of form.fields) {
-      if (f.groupId && !processedGroups.has(f.groupId)) {
-        processedGroups.add(f.groupId)
-        const groupFields = form.fields.filter(gf => gf.groupId === f.groupId)
-        lines.push(`          <${f.groupId}>`)
-        groupFields.forEach(gf => lines.push(`            <${gf.id}/>`))
-        lines.push(`          </${f.groupId}>`)
-      } else if (f.repeatGroupId && !processedRepeats.has(f.repeatGroupId)) {
+      // Determine target group nesting
+      const targetGroups: string[] = []
+      if (f.groupId) {
+        targetGroups.push(...getGroupAncestors(f.groupId), f.groupId)
+      }
+
+      // Close groups no longer needed
+      while (openGroups.length > 0 && !targetGroups.includes(openGroups[openGroups.length - 1])) {
+        const closing = openGroups.pop()!
+        lines.push(`${indent(openGroups.length)}</${closing}>`)
+      }
+
+      // Open groups that are needed
+      for (const gid of targetGroups) {
+        if (!openGroups.includes(gid)) {
+          lines.push(`${indent(openGroups.length)}<${gid}>`)
+          openGroups.push(gid)
+        }
+      }
+
+      if (f.repeatGroupId && !processedRepeats.has(f.repeatGroupId)) {
         processedRepeats.add(f.repeatGroupId)
         const repeatFields = form.fields.filter(rf => rf.repeatGroupId === f.repeatGroupId)
-        lines.push(`          <${f.repeatGroupId}>`)
-        repeatFields.forEach(rf => lines.push(`            <${rf.id}/>`))
-        lines.push(`          </${f.repeatGroupId}>`)
-      } else if (!f.groupId && !f.repeatGroupId) {
-        lines.push(`          <${f.id}/>`)
+        lines.push(`${indent(openGroups.length)}<${f.repeatGroupId}>`)
+        repeatFields.forEach(rf => lines.push(`${indent(openGroups.length + 1)}<${rf.id}/>`))
+        lines.push(`${indent(openGroups.length)}</${f.repeatGroupId}>`)
+      } else if (!f.repeatGroupId) {
+        lines.push(`${indent(openGroups.length)}<${f.id}/>`)
       }
     }
+
+    // Close remaining open groups
+    while (openGroups.length > 0) {
+      const closing = openGroups.pop()!
+      lines.push(`${indent(openGroups.length)}</${closing}>`)
+    }
+
     return lines.join('\n')
   }
 
   const instanceFields = buildInstanceFields()
 
-  // Binds (with group/repeat path prefixes)
+  // Binds (with group/repeat path prefixes, supporting nested groups)
   const getFieldPath = (f: FormField): string => {
-    if (f.groupId) return `/data/${f.groupId}/${f.id}`
+    if (f.groupId) {
+      const ancestors = getGroupAncestors(f.groupId)
+      const path = [...ancestors, f.groupId, f.id].join('/')
+      return `/data/${path}`
+    }
     if (f.repeatGroupId) return `/data/${f.repeatGroupId}/${f.id}`
     return fieldRef(f.id)
   }
@@ -227,36 +265,63 @@ export function formToXForm(form: Form): string {
     return `        <bind ${attrs.join(' ')}/>`
   }).join('\n')
 
-  // Body elements with group/repeat wrappers
+  // Body elements with group/repeat wrappers (supporting nested groups)
   const buildBodyElements = (): string => {
     const lines: string[] = []
-    const processedGroups = new Set<string>()
+    const openGroups: string[] = []
     const processedRepeats = new Set<string>()
 
+    const bodyIndent = (depth: number) => '          ' + '  '.repeat(depth)
+
+    const getGroupRef = (gid: string): string => {
+      const ancestors = getGroupAncestors(gid)
+      return '/data/' + [...ancestors, gid].join('/')
+    }
+
     for (const f of form.fields) {
-      if (f.groupId && !processedGroups.has(f.groupId)) {
-        processedGroups.add(f.groupId)
-        const group = groupMap.get(f.groupId)
-        const groupFields = form.fields.filter(gf => gf.groupId === f.groupId)
-        const appearance = group?.appearance ? ` appearance="${group.appearance}"` : ''
-        lines.push(`          <group ref="/data/${f.groupId}"${appearance}>`)
-        if (group?.label) lines.push(`            <label>${escapeXml(group.label)}</label>`)
-        groupFields.forEach(gf => lines.push(`            ${xformBodyElement(gf)}`))
-        lines.push(`          </group>`)
-      } else if (f.repeatGroupId && !processedRepeats.has(f.repeatGroupId)) {
+      const targetGroups: string[] = []
+      if (f.groupId) {
+        targetGroups.push(...getGroupAncestors(f.groupId), f.groupId)
+      }
+
+      // Close groups no longer needed
+      while (openGroups.length > 0 && !targetGroups.includes(openGroups[openGroups.length - 1])) {
+        openGroups.pop()
+        lines.push(`${bodyIndent(openGroups.length)}</group>`)
+      }
+
+      // Open groups that are needed
+      for (const gid of targetGroups) {
+        if (!openGroups.includes(gid)) {
+          const group = groupMap.get(gid)
+          const appearance = group?.appearance ? ` appearance="${group.appearance}"` : ''
+          lines.push(`${bodyIndent(openGroups.length)}<group ref="${getGroupRef(gid)}"${appearance}>`)
+          if (group?.label) lines.push(`${bodyIndent(openGroups.length + 1)}<label>${escapeXml(group.label)}</label>`)
+          openGroups.push(gid)
+        }
+      }
+
+      if (f.repeatGroupId && !processedRepeats.has(f.repeatGroupId)) {
         processedRepeats.add(f.repeatGroupId)
         const rg = repeatMap.get(f.repeatGroupId)
         const repeatFields = form.fields.filter(rf => rf.repeatGroupId === f.repeatGroupId)
-        lines.push(`          <group ref="/data/${f.repeatGroupId}">`)
-        if (rg?.label) lines.push(`            <label>${escapeXml(rg.label)}</label>`)
-        lines.push(`            <repeat nodeset="/data/${f.repeatGroupId}">`)
-        repeatFields.forEach(rf => lines.push(`              ${xformBodyElement(rf)}`))
-        lines.push(`            </repeat>`)
-        lines.push(`          </group>`)
-      } else if (!f.groupId && !f.repeatGroupId) {
-        lines.push(`          ${xformBodyElement(f)}`)
+        lines.push(`${bodyIndent(openGroups.length)}<group ref="/data/${f.repeatGroupId}">`)
+        if (rg?.label) lines.push(`${bodyIndent(openGroups.length + 1)}<label>${escapeXml(rg.label)}</label>`)
+        lines.push(`${bodyIndent(openGroups.length + 1)}<repeat nodeset="/data/${f.repeatGroupId}">`)
+        repeatFields.forEach(rf => lines.push(`${bodyIndent(openGroups.length + 2)}${xformBodyElement(rf)}`))
+        lines.push(`${bodyIndent(openGroups.length + 1)}</repeat>`)
+        lines.push(`${bodyIndent(openGroups.length)}</group>`)
+      } else if (!f.repeatGroupId) {
+        lines.push(`${bodyIndent(openGroups.length)}${xformBodyElement(f)}`)
       }
     }
+
+    // Close remaining open groups
+    while (openGroups.length > 0) {
+      openGroups.pop()
+      lines.push(`${bodyIndent(openGroups.length)}</group>`)
+    }
+
     return lines.join('\n')
   }
 
@@ -324,16 +389,45 @@ export function formToXLSForm(form: Form): { survey: string[][]; choices: string
   const repeatGroups = form.repeatGroups || []
   const groupMap = new Map(groups.map(g => [g.id, g]))
   const repeatMap = new Map(repeatGroups.map(r => [r.id, r]))
-  const openedGroups = new Set<string>()
   const openedRepeats = new Set<string>()
 
+  // Build ancestor chain for a group (parent → grandparent → ... from outermost to innermost)
+  const getAncestorChain = (groupId: string): string[] => {
+    const chain: string[] = []
+    let current = groupMap.get(groupId)
+    while (current?.parentId && groupMap.has(current.parentId)) {
+      chain.unshift(current.parentId)
+      current = groupMap.get(current.parentId)
+    }
+    return chain
+  }
+
+  // Track which groups are currently open (as a stack)
+  const openGroupStack: string[] = []
+
   for (const field of form.fields) {
-    // Open group if needed
-    if (field.groupId && !openedGroups.has(field.groupId)) {
-      openedGroups.add(field.groupId)
-      const group = groupMap.get(field.groupId)
-      const appearance = group?.appearance || ''
-      survey.push(['begin_group', field.groupId, group?.label || field.groupId, group?.description || '', '', '', '', '', '', appearance, '', '', ''])
+    // Determine the full group nesting needed for this field
+    const targetGroups: string[] = []
+    if (field.groupId) {
+      targetGroups.push(...getAncestorChain(field.groupId), field.groupId)
+    }
+
+    // Close groups that are no longer needed (from innermost out)
+    while (openGroupStack.length > 0) {
+      const topGroup = openGroupStack[openGroupStack.length - 1]
+      if (targetGroups.includes(topGroup)) break
+      openGroupStack.pop()
+      survey.push(['end_group', '', '', '', '', '', '', '', '', '', '', '', ''])
+    }
+
+    // Open groups that are needed but not yet open
+    for (const gid of targetGroups) {
+      if (!openGroupStack.includes(gid)) {
+        const group = groupMap.get(gid)
+        const appearance = group?.appearance || ''
+        survey.push(['begin_group', gid, group?.label || gid, group?.description || '', '', '', '', '', '', appearance, '', '', ''])
+        openGroupStack.push(gid)
+      }
     }
 
     // Open repeat if needed
@@ -382,14 +476,12 @@ export function formToXLSForm(form: Form): { survey: string[][]; choices: string
         survey.push(['end_repeat', '', '', '', '', '', '', '', '', '', '', '', ''])
       }
     }
+  }
 
-    // Close group if this is the last field in the group
-    if (field.groupId) {
-      const groupFields = form.fields.filter(f => f.groupId === field.groupId)
-      if (groupFields[groupFields.length - 1]?.id === field.id) {
-        survey.push(['end_group', '', '', '', '', '', '', '', '', '', '', '', ''])
-      }
-    }
+  // Close any remaining open groups
+  while (openGroupStack.length > 0) {
+    openGroupStack.pop()
+    survey.push(['end_group', '', '', '', '', '', '', '', '', '', '', '', ''])
   }
 
   const version = form.versions?.length

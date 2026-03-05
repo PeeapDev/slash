@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useParams, useSearchParams } from "next/navigation"
 import type { Form, FormField, FormGroupMeta } from "@/lib/form-store"
 import { getFormById, getFormResponses, saveFormResponses, updateFormResponse, waitForHydration, publishForm, getForms, saveForms } from "@/lib/form-store"
@@ -18,7 +18,7 @@ import {
 // ─── Text styling helper: parse **bold**, *italic*, [links](url) ───
 function renderStyledText(text: string) {
   if (!text) return null
-  const parts: (string | JSX.Element)[] = []
+  const parts: (string | React.JSX.Element)[] = []
   let remaining = text
   let key = 0
   const regex = /\*\*(.+?)\*\*|\*(.+?)\*|\[(.+?)\]\((.+?)\)/g
@@ -81,24 +81,41 @@ function buildSections(form: Form, visibleFields: FormField[]): DynamicSection[]
       : [{ id: "survey", label: "Survey Questions", fields: [] }]
   }
 
+  const groupIdSet = new Set(groups.map(g => g.id))
+
+  // Identify top-level groups: no parentId, or parent not in our group list
+  const topLevelGroups = groups.filter(g => !g.parentId || !groupIdSet.has(g.parentId))
+
+  // Build a map of parent → child group IDs (all descendants)
+  const getDescendantIds = (parentId: string): string[] => {
+    const children = groups.filter(g => g.parentId === parentId)
+    const ids: string[] = []
+    for (const child of children) {
+      ids.push(child.id)
+      ids.push(...getDescendantIds(child.id))
+    }
+    return ids
+  }
+
   const sections: DynamicSection[] = []
   const usedFieldIds = new Set<string>()
 
-  // Check for field-list groups — these get merged into the preceding/following section
-  const fieldListGroupIds = new Set(groups.filter(g => g.appearance === 'field-list').map(g => g.id))
-
-  for (const group of groups) {
+  for (const group of topLevelGroups) {
+    // Collect fields from this group and all descendant groups
+    const relevantGroupIds = new Set([group.id, ...getDescendantIds(group.id)])
     const groupFields = form.fields.filter(
-      f => f.groupId === group.id && !f.repeatGroupId && visibleIds.has(f.id)
+      f => f.groupId && relevantGroupIds.has(f.groupId) && !f.repeatGroupId && visibleIds.has(f.id)
     )
     groupFields.forEach(f => usedFieldIds.add(f.id))
     if (groupFields.length > 0) {
+      const isFieldList = group.appearance === 'field-list' ||
+        [...relevantGroupIds].some(gid => groups.find(g => g.id === gid)?.appearance === 'field-list')
       sections.push({
         id: group.id,
         label: group.label,
         description: group.description,
         fields: groupFields,
-        isFieldList: fieldListGroupIds.has(group.id),
+        isFieldList,
       })
     }
   }
